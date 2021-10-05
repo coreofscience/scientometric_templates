@@ -117,15 +117,12 @@ scopus_country <-
   arrange(desc(papers)) |> 
   slice(1:10)
 
-# Merging both datasets
-
-wos_country |> 
-  left
-
-# wos_scopus_country <- 
+wos_scopus_country <- 
   wos_country |> 
   bind_rows(scopus_country) |> 
-  mutate(country = as.character(country)) |> 
+  mutate(country = as.character(country)) 
+
+wos_scopus_country |> 
   ggplot(aes(x = reorder(country, papers), 
              y = papers, 
              fill = database)) +
