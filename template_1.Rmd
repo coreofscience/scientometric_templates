@@ -2,7 +2,7 @@
 title: "R Notebook"
 output: html_notebook
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 # Creating the environment
@@ -19,27 +19,109 @@ library(igraph)
 library(tidytext)
 library(wordcloud)
 library(rebus)
+library(lessr)
 ```
 
 # Data getting
 
 ```{r}
-wos_scopus <- 
-  tosr::tosr_load("DCA 467 15 July 2021.bib", 
+wos_scopus_tos <- 
+  tosr::tosr_load("DCA 467 15 July 2021.bib",  # Create data from searches 
                   "DCA 467 15 July 2021.txt")
 
 wos <- 
-  bibliometrix::convert2df("DCA 467 15 July 2021.txt")
+  bibliometrix::convert2df("DCA 467 15 July 2021.txt") # create dataframe from wos file
 
 scopus <- 
-  bibliometrix::convert2df("DCA 467 15 July 2021.bib", 
+  bibliometrix::convert2df("DCA 467 15 July 2021.bib", # Create dataframe from scopus file
                            dbsource = "scopus", 
                            format = "bibtex")
 
 
 ```
 
-## Table 1. Criteria 
+## Table 1. Search Criteria
+
+```{r}
+table_1 <- 
+  tibble(wos = length(wos$SR), # Create a dataframe with the values.
+         scopus = length(scopus$SR), 
+         total = length(wos_scopus_tos$df$SR))
+table_1
+```
+
+## Figure 1. Languages
+
+```{r}
+main_languages <- 
+  wos_scopus_tos$df |> 
+  select(LA) |> 
+  separate_rows(LA, sep = "; ") |> 
+  count(LA, sort = TRUE) |> 
+  slice(1:5)
+
+other_languages <- 
+  wos_scopus_tos$df |> 
+  separate_rows(LA, sep = "; ") |> 
+  select(LA) |> 
+  count(LA, sort = TRUE) |> 
+  slice(6:n) |> 
+  summarise(n = sum(n)) |> 
+  mutate(LA = "OTHERS") |> 
+  select(LA, n)
+
+languages <- 
+  main_languages |> 
+  bind_rows(other_languages) |> 
+  uncount(n) |> 
+  rename(language = LA)
+
+PieChart(data = languages, x = language)
+```
+
+## Figure 2. Scientific Production
+
+```{r}
+wos_anual_production <- 
+  wos |> 
+  select(PY) |> 
+  count(PY, sort = TRUE) |> 
+  na.omit() |> 
+  filter(PY >= 2000) |> 
+  mutate(ref_type = "wos")
+
+scopus_anual_production  <- 
+  scopus |> 
+  select(PY) |> 
+  count(PY, sort = TRUE) |> 
+  na.omit() |> 
+  filter(PY >= 2000) |>
+  mutate(ref_type = "scopus")
+
+total_anual_production <- 
+  wos_scopus_tos$df |> 
+  select(PY) |> 
+  count(PY, sort = TRUE) |> 
+  na.omit() |> 
+  filter(PY >= 2000) |>
+  mutate(ref_type = "total")
+
+
+
+```
+
+
+## Table 2. Country production
+
+## Table 3. Author production
+
+## Table 4. Journal production
+
+## Figure 3. Co-citation network
+
+## Figure 4. Tree of Science
+
+
 
 ```{r}
 data_science$df |> 
@@ -93,7 +175,7 @@ wos_scopus_years |>
 ```{r}
 wos |> 
   select(C1)
-  
+
 ```
 
 ```{r}
@@ -253,7 +335,7 @@ nodes_full_data |>
   mutate(full_name = str_extract(full_name, pattern_authors),
          full_name = str_remove(full_name, pattern_titles),
          full_name = str_trim(full_name))  |> 
-unnest_tokens(output = word, input = full_name) |> 
+  unnest_tokens(output = word, input = full_name) |> 
   anti_join(stop_words) |> 
   filter(word == str_remove(word, pattern = "research"), 
          word == str_remove(word, pattern = "analysis"), 
@@ -273,7 +355,7 @@ nodes_full_data |>
   mutate(full_name = str_extract(full_name, pattern_authors),
          full_name = str_remove(full_name, pattern_titles),
          full_name = str_trim(full_name))  |> 
-unnest_tokens(output = word, input = full_name) |> 
+  unnest_tokens(output = word, input = full_name) |> 
   anti_join(stop_words) |> 
   filter(word == str_remove(word, pattern = "research"), 
          word == str_remove(word, pattern = "analysis"), 
@@ -293,7 +375,7 @@ nodes_full_data |>
   mutate(full_name = str_extract(full_name, pattern_authors),
          full_name = str_remove(full_name, pattern_titles),
          full_name = str_trim(full_name))  |> 
-unnest_tokens(output = word, input = full_name) |> 
+  unnest_tokens(output = word, input = full_name) |> 
   anti_join(stop_words) |> 
   filter(word == str_remove(word, pattern = "research"), 
          word == str_remove(word, pattern = "analysis"), 
