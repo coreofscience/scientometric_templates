@@ -125,6 +125,48 @@ wos_scopus_total_annual_production |>
 
 ## Table 2. Country production
 
+```{r}
+data_biblio_wos <- biblioAnalysis(wos)
+
+wos_country <- 
+  data_biblio_wos$Countries |> 
+  data.frame() |> 
+  mutate(database = "wos") |> 
+  select(country = Tab, papers = Freq, database ) |> 
+  arrange(desc(papers)) 
+
+data_biblio_scopus <- biblioAnalysis(scopus)
+
+scopus_country <- 
+  data_biblio_scopus$Countries |> 
+  data.frame() |> 
+  mutate(database = "scopus") |> 
+  select(country = Tab, papers = Freq, database ) |> 
+  arrange(desc(papers)) 
+
+data_biblio_total <- biblioAnalysis(wos_scopus$df)
+  
+total_country <- 
+  data_biblio_total$Countries |> 
+  data.frame() |> 
+  mutate(database = "total") |> 
+  select(country = Tab, papers = Freq, database ) |> 
+  arrange(desc(papers)) 
+
+wos_scopus_total_country <- 
+  wos_country |> 
+  bind_rows(scopus_country, 
+            total_country) |> 
+  mutate(country = as.character(country)) |> 
+  pivot_wider(names_from = database, 
+              values_from = papers) |> 
+  arrange(desc(total)) |> 
+  slice(1:10) |> 
+  mutate(percentage = total / (table_1 |> pull(total)),
+         percentage = round(percentage, digits = 2))
+```
+
+
 ## Table 3. Author production
 
 ## Table 4. Journal production
