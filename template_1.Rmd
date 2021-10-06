@@ -1,0 +1,504 @@
+---
+title: "R Notebook"
+output: html_notebook
+editor_options: 
+  chunk_output_type: inline
+---
+
+# Creating the environment
+
+```{r}
+library(tidyverse)
+library(tosr)
+library(bibliometrix)
+library(sjrdata)
+library(journalabbr)
+library(gt)
+library(lubridate)
+library(igraph)
+library(tidytext)
+library(wordcloud)
+library(rebus)
+library(lessr)
+```
+
+# Data getting
+
+```{r}
+wos_scopus_tos <- 
+  tosr::tosr_load("DCA 467 15 July 2021.bib",  # Create data from searches 
+                  "DCA 467 15 July 2021.txt")
+
+wos <- 
+  bibliometrix::convert2df("DCA 467 15 July 2021.txt") # create dataframe from wos file
+
+scopus <- 
+  bibliometrix::convert2df("DCA 467 15 July 2021.bib", # Create dataframe from scopus file
+                           dbsource = "scopus", 
+                           format = "bibtex")
+
+
+```
+
+## Table 1. Search Criteria
+
+```{r}
+table_1 <- 
+  tibble(wos = length(wos$SR), # Create a dataframe with the values.
+         scopus = length(scopus$SR), 
+         total = length(wos_scopus_tos$df$SR))
+table_1
+```
+
+## Figure 1. Languages
+
+```{r}
+main_languages <- 
+  wos_scopus_tos$df |> 
+  select(LA) |> 
+  separate_rows(LA, sep = "; ") |> 
+  count(LA, sort = TRUE) |> 
+  slice(1:5)
+
+other_languages <- 
+  wos_scopus_tos$df |> 
+  separate_rows(LA, sep = "; ") |> 
+  select(LA) |> 
+  count(LA, sort = TRUE) |> 
+  slice(6:n) |> 
+  summarise(n = sum(n)) |> 
+  mutate(LA = "OTHERS") |> 
+  select(LA, n)
+
+languages <- 
+  main_languages |> 
+  bind_rows(other_languages) |> 
+  uncount(n) |> 
+  rename(language = LA)
+
+PieChart(data = languages, x = language)
+```
+
+## Figure 2. Scientific Production
+
+```{r}
+wos_anual_production <- 
+  wos |> 
+  select(PY) |> 
+  count(PY, sort = TRUE) |> 
+  na.omit() |> 
+  filter(PY >= 2000,
+         PY < year(today())) |> 
+  mutate(ref_type = "wos")
+
+scopus_anual_production  <- 
+  scopus |> 
+  select(PY) |> 
+  count(PY, sort = TRUE) |> 
+  na.omit() |> 
+  filter(PY >= 2000,
+         PY < year(today())) |>
+  mutate(ref_type = "scopus")
+
+total_anual_production <- 
+  wos_scopus_tos$df |> 
+  select(PY) |> 
+  count(PY, sort = TRUE) |> 
+  na.omit() |> 
+  filter(PY >= 2000,
+         PY < year(today())) |>
+  mutate(ref_type = "total")
+
+wos_scopus_total_annual_production <- 
+  wos_anual_production |> 
+  bind_rows(scopus_anual_production,
+            total_anual_production) 
+
+wos_scopus_total_annual_production |> 
+  ggplot(aes(x = PY, y = n, fill = ref_type)) +
+  geom_line(aes(color = ref_type)) +
+  labs(title = "Annual Scientific Production", 
+       x = "years",
+       y = "papers") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+## Table 2. Country production
+
+```{r}
+data_biblio_wos <- biblioAnalysis(wos)
+
+wos_country <- 
+  data_biblio_wos$Countries |> 
+  data.frame() |> 
+  mutate(database = "wos") |> 
+  select(country = Tab, papers = Freq, database ) |> 
+  arrange(desc(papers)) 
+
+data_biblio_scopus <- biblioAnalysis(scopus)
+
+scopus_country <- 
+  data_biblio_scopus$Countries |> 
+  data.frame() |> 
+  mutate(database = "scopus") |> 
+  select(country = Tab, papers = Freq, database ) |> 
+  arrange(desc(papers)) 
+
+data_biblio_total <- biblioAnalysis(wos_scopus$df)
+  
+total_country <- 
+  data_biblio_total$Countries |> 
+  data.frame() |> 
+  mutate(database = "total") |> 
+  select(country = Tab, papers = Freq, database ) |> 
+  arrange(desc(papers)) 
+
+wos_scopus_total_country <- 
+  wos_country |> 
+  bind_rows(scopus_country, 
+            total_country) |> 
+  mutate(country = as.character(country)) |> 
+  pivot_wider(names_from = database, 
+              values_from = papers) |> 
+  arrange(desc(total)) |> 
+  slice(1:10) |> 
+  mutate(percentage = total / (table_1 |> pull(total)),
+         percentage = round(percentage, digits = 2))
+```
+
+
+## Table 3. Author production
+
+```{r}
+wos_authors <- 
+  data_biblio_wos$Authors |> 
+  data.frame() |> 
+  rename(authors_wos = AU, papers_wos = Freq) |> 
+  arrange(desc(papers_wos)) |> 
+  slice(1:10) |> 
+  mutate(database_wos = "wos")
+
+
+scopus_authors <- 
+  data_biblio_scopus$Authors |> 
+  data.frame() |> 
+  rename(authors_scopus = AU, papers_scopus = Freq) |> 
+  arrange(desc(papers_scopus)) |> 
+  slice(1:10) |> 
+  mutate(database_scopus = "scopus")
+
+total_authors <- 
+  data_biblio_total$Authors |> 
+  data.frame() |> 
+  rename(authors_total = AU, 
+         papers_total = Freq) |> 
+  arrange(desc(papers_total)) |> 
+  slice(1:10) |> 
+  mutate(database_total = "total")
+
+wos_scopus_authors <- 
+  wos_authors |> 
+  bind_cols(scopus_authors,
+            total_authors)
+```
+
+
+## Table 4. Journal production
+
+```{r}
+wos_journal <- 
+  wos |> 
+  filter(str_detect(DT, "ARTICLE")) |> 
+  select(journal = SO) |> 
+  na.omit() |> 
+  count(journal, sort = TRUE) |> 
+  slice(1:20) |> 
+  rename(publications = n) |> 
+  mutate(database = "wos")
+
+scopus_journal <- 
+  scopus |> 
+  filter(str_detect(DT, "ARTICLE")) |> 
+  select(journal = SO) |> 
+  na.omit() |> 
+  count(journal, sort = TRUE) |> 
+  slice(1:20) |> 
+  rename(publications = n) |> 
+  mutate(database = "scopus")
+
+total_journal <- 
+  wos_scopus_tos$df |> 
+  filter(str_detect(DT, "ARTICLE")) |> 
+  select(journal = SO) |> 
+  na.omit() |> 
+  count(journal, sort = TRUE) |> 
+  slice(1:20) |> 
+  rename(publications = n) |> 
+  mutate(database = "total")
+
+wos_scopus_total_journal <- 
+  wos_journal |> 
+  bind_rows(scopus_journal, 
+            total_journal) |> 
+  pivot_wider(names_from = database, 
+              values_from = publications) |> 
+  arrange(desc(total)) |> 
+  slice(1:10) |> 
+  mutate(percentage = total / table_1 |> pull(total),
+         percentage = round(percentage, digits = 2))
+```
+
+## Figure 3. Co-citation network
+
+### Author co-citation network
+
+```{r}
+wos_scopus_author_metatag <- 
+  metaTagExtraction(wos_scopus$df, Field = "CR_AU")
+
+wos_scopus_author_co_citation <- 
+  biblioNetwork(M = wos_scopus_author_metatag, 
+                analysis = "co-citation", 
+                network = "authors")
+
+plot_net_author_co_citation <- 
+  networkPlot(wos_scopus_author_co_citation, 
+              weighted=T, 
+              n = 30, 
+              Title = "Author Co-citation Network", 
+              type = "fruchterman", 
+              size=T,
+              edgesize = 5,
+              labelsize=0.7)
+```
+
+### Author Collaboration network
+
+```{r}
+wos_scopus_author_collab_matrix <- 
+  biblioNetwork(M = wos_scopus$df, 
+                analysis = "collaboration", 
+                network = "authors")
+
+plot_author_collab <- 
+  networkPlot(NetMatrix = wos_scopus_author_collab_matrix, 
+              weighted=T, n = 30, 
+              Title = "Author Collaboration Network", 
+              type = "fruchterman", 
+              size=T,
+              edgesize = 5,
+              labelsize=0.7)
+```
+
+### Country Collaboration Network
+
+```{r}
+wos_scopus_country_collab_matrix <- 
+  biblioNetwork(M = wos_scopus$df, 
+                analysis = "collaboration", 
+                network = "countries")
+
+plot_country_collab <- 
+  networkPlot(wos_scopus_country_collab_matrix, 
+              weighted=T, n = 30, 
+              Title = "Country Collaboration Network", 
+              type = "fruchterman", 
+              size=T,
+              edgesize = 5,
+              labelsize=0.7)
+```
+
+### Keyword co-citation network
+
+```{r}
+wos_scopus_keyword_co_occurrence <- 
+  biblioNetwork(M = wos_scopus$df, 
+                analysis = "co-occurrences", 
+                network = "keywords", 
+                sep = ";")
+
+plot_net_co_occurrence <- 
+  networkPlot(wos_scopus_keyword_co_occurrence, 
+              weighted=T, n = 30, 
+              Title = "Keyword Co-occurrence Network", 
+              type = "fruchterman", 
+              size=T,
+              edgesize = 5,
+              labelsize=0.7)
+```
+
+
+
+
+
+
+## Figure 4. Tree of Science
+
+# otro
+
+## Figure 2 keyword co-occ and author co-cit
+
+Co-occurrence network
+
+```{r}
+wos_scopus_co_occurrence <- 
+  biblioNetwork(M = wos_scopus$df, 
+                analysis = "co-occurrences", 
+                network = "keywords", 
+                sep = ";")
+
+plot_net_co_occurrence <- 
+  networkPlot(wos_scopus_co_occurrence, 
+              weighted=T, n = 30, 
+              Title = "Keyword Cooccurrences", 
+              type = "fruchterman", 
+              size=T,
+              edgesize = 5,
+              labelsize=0.7)
+```
+
+co-citation authors
+
+```{r}
+wos_scopus_metatag <- 
+  metaTagExtraction(wos_scopus$df, Field = "CR_AU")
+
+wos_scopus_co_citation <- 
+  biblioNetwork(M = wos_scopus_metatag, 
+                analysis = "co-citation", 
+                network = "authors")
+
+plot_net_co_citation <- 
+  networkPlot(wos_scopus_co_citation, 
+              weighted=T, 
+              n = 30, 
+              Title = "Keyword Cooccurrences", 
+              type = "fruchterman", 
+              size=T,
+              edgesize = 5,
+              labelsize=0.7)
+```
+
+## Clustering analysis
+
+```{r}
+nodes <-  
+  tibble(name = V(wos_scopus$graph)$name) |> 
+  left_join(wos_scopus$nodes, 
+            by = c("name" = "ID_TOS"))
+
+wos_scopus_citation_network <- 
+  wos_scopus$graph |> 
+  igraph::set.vertex.attribute(name = "full_name", 
+                               index = V(wos_scopus_citation_network)$name, 
+                               value = nodes$CITE)
+```
+
+
+Choosing clusters
+
+```{r}
+clusters <- 
+  tibble(cluster = V(wos_scopus_citation_network)$subfield) |> 
+  count(cluster, sort = TRUE)
+
+clusters |> 
+  ggplot(aes(x = reorder(cluster, n), y = n)) +
+  geom_point() 
+```
+
+Removing not chosen clusters
+
+```{r}
+wos_scopus_citation_network_clusters <- 
+  wos_scopus_citation_network |> 
+  delete.vertices(which(V(wos_scopus_citation_network)$subfield != 14 & 
+                          V(wos_scopus_citation_network)$subfield != 4 &
+                          V(wos_scopus_citation_network)$subfield != 9))
+```
+
+## World cloud
+
+### Cluster 1
+
+```{r}
+pal <- brewer.pal(8,"Dark2")
+
+nodes_full_data |> 
+  filter(cluster == 14) |> 
+  select(full_name) |> 
+  mutate(full_name = str_extract(full_name, pattern_authors),
+         full_name = str_remove(full_name, pattern_titles),
+         full_name = str_trim(full_name))  |> 
+  unnest_tokens(output = word, input = full_name) |> 
+  anti_join(stop_words) |> 
+  filter(word == str_remove(word, pattern = "research"), 
+         word == str_remove(word, pattern = "analysis"), 
+         word == str_remove(word, pattern = "science"),
+         word == str_remove(word, pattern = "scientometric"),
+         word == str_remove(word, pattern = "bibliometric")) |>
+  count(word, sort = TRUE) |> 
+  with(wordcloud(word, n, random.order = FALSE, max.words = 50, colors=pal))
+```
+
+### Cluster 2
+
+```{r}
+nodes_full_data |> 
+  filter(cluster == 4) |> 
+  select(full_name) |> 
+  mutate(full_name = str_extract(full_name, pattern_authors),
+         full_name = str_remove(full_name, pattern_titles),
+         full_name = str_trim(full_name))  |> 
+  unnest_tokens(output = word, input = full_name) |> 
+  anti_join(stop_words) |> 
+  filter(word == str_remove(word, pattern = "research"), 
+         word == str_remove(word, pattern = "analysis"), 
+         word == str_remove(word, pattern = "science"),
+         word == str_remove(word, pattern = "scientometric"),
+         word == str_remove(word, pattern = "bibliometric")) |>
+  count(word, sort = TRUE) |> 
+  with(wordcloud(word, n, random.order = FALSE, max.words = 50, colors=pal))
+```
+
+### Cluster 3
+
+```{r}
+nodes_full_data |> 
+  filter(cluster == 9) |> 
+  select(full_name) |> 
+  mutate(full_name = str_extract(full_name, pattern_authors),
+         full_name = str_remove(full_name, pattern_titles),
+         full_name = str_trim(full_name))  |> 
+  unnest_tokens(output = word, input = full_name) |> 
+  anti_join(stop_words) |> 
+  filter(word == str_remove(word, pattern = "research"), 
+         word == str_remove(word, pattern = "analysis"), 
+         word == str_remove(word, pattern = "science"),
+         word == str_remove(word, pattern = "scientometric"),
+         word == str_remove(word, pattern = "bibliometric")) |>
+  count(word, sort = TRUE) |> 
+  with(wordcloud(word, n, random.order = FALSE, max.words = 50, colors=pal))
+```
+
+
+
+# Exporting files
+
+```{r}
+# Exporting nodes
+
+nodes_full_data <- 
+  tibble(id = V(wos_scopus_citation_network_clusters)$name,
+         cluster = V(wos_scopus_citation_network_clusters)$subfield,
+         full_name = V(wos_scopus_citation_network_clusters)$full_name)
+
+write.csv(nodes_full_data, "nodes_full_data.csv")
+
+# Exporting network
+
+write.graph(wos_scopus_citation_network_clusters, 
+            "wos_scopus_citation_network_clusters.graphml", 
+            "graphml")
+```
+
