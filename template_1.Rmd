@@ -87,7 +87,8 @@ wos_anual_production <-
   select(PY) |> 
   count(PY, sort = TRUE) |> 
   na.omit() |> 
-  filter(PY >= 2000) |> 
+  filter(PY >= 2000,
+         PY < year(today())) |> 
   mutate(ref_type = "wos")
 
 scopus_anual_production  <- 
@@ -95,7 +96,8 @@ scopus_anual_production  <-
   select(PY) |> 
   count(PY, sort = TRUE) |> 
   na.omit() |> 
-  filter(PY >= 2000) |>
+  filter(PY >= 2000,
+         PY < year(today())) |>
   mutate(ref_type = "scopus")
 
 total_anual_production <- 
@@ -103,13 +105,23 @@ total_anual_production <-
   select(PY) |> 
   count(PY, sort = TRUE) |> 
   na.omit() |> 
-  filter(PY >= 2000) |>
+  filter(PY >= 2000,
+         PY < year(today())) |>
   mutate(ref_type = "total")
 
+wos_scopus_total_annual_production <- 
+  wos_anual_production |> 
+  bind_rows(scopus_anual_production,
+            total_anual_production) 
 
-
+wos_scopus_total_annual_production |> 
+  ggplot(aes(x = PY, y = n, fill = ref_type)) +
+  geom_line(aes(color = ref_type)) +
+  labs(title = "Annual Scientific Production", 
+       x = "years",
+       y = "papers") +
+  theme(plot.title = element_text(hjust = 0.5))
 ```
-
 
 ## Table 2. Country production
 
