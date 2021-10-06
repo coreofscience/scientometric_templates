@@ -169,13 +169,91 @@ wos_scopus_total_country <-
 
 ## Table 3. Author production
 
+```{r}
+wos_authors <- 
+  data_biblio_wos$Authors |> 
+  data.frame() |> 
+  rename(authors_wos = AU, papers_wos = Freq) |> 
+  arrange(desc(papers_wos)) |> 
+  slice(1:10) |> 
+  mutate(database_wos = "wos")
+
+
+scopus_authors <- 
+  data_biblio_scopus$Authors |> 
+  data.frame() |> 
+  rename(authors_scopus = AU, papers_scopus = Freq) |> 
+  arrange(desc(papers_scopus)) |> 
+  slice(1:10) |> 
+  mutate(database_scopus = "scopus")
+
+total_authors <- 
+  data_biblio_total$Authors |> 
+  data.frame() |> 
+  rename(authors_total = AU, 
+         papers_total = Freq) |> 
+  arrange(desc(papers_total)) |> 
+  slice(1:10) |> 
+  mutate(database_total = "total")
+
+wos_scopus_authors <- 
+  wos_authors |> 
+  bind_cols(scopus_authors,
+            total_authors)
+```
+
+
 ## Table 4. Journal production
+
+```{r}
+wos_journal <- 
+  wos |> 
+  filter(str_detect(DT, "ARTICLE")) |> 
+  select(journal = SO) |> 
+  na.omit() |> 
+  count(journal, sort = TRUE) |> 
+  slice(1:20) |> 
+  rename(publications = n) |> 
+  mutate(database = "wos")
+
+scopus_journal <- 
+  scopus |> 
+  filter(str_detect(DT, "ARTICLE")) |> 
+  select(journal = SO) |> 
+  na.omit() |> 
+  count(journal, sort = TRUE) |> 
+  slice(1:20) |> 
+  rename(publications = n) |> 
+  mutate(database = "scopus")
+
+total_journal <- 
+  wos_scopus_tos$df |> 
+  filter(str_detect(DT, "ARTICLE")) |> 
+  select(journal = SO) |> 
+  na.omit() |> 
+  count(journal, sort = TRUE) |> 
+  slice(1:20) |> 
+  rename(publications = n) |> 
+  mutate(database = "total")
+
+wos_scopus_total_journal <- 
+  wos_journal |> 
+  bind_rows(scopus_journal, 
+            total_journal) |> 
+  pivot_wider(names_from = database, 
+              values_from = publications) |> 
+  arrange(desc(total)) |> 
+  slice(1:10) |> 
+  mutate(percentage = total / table_1 |> pull(total),
+         percentage = round(percentage, digits = 2))
+```
+
 
 ## Figure 3. Co-citation network
 
 ## Figure 4. Tree of Science
 
-
+# otro
 
 ```{r}
 data_science$df |> 
