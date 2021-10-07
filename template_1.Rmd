@@ -334,50 +334,7 @@ plot_net_co_occurrence <-
 
 ## Figure 4. Tree of Science
 
-# otro
-
-## Figure 2 keyword co-occ and author co-cit
-
-Co-occurrence network
-
-```{r}
-wos_scopus_co_occurrence <- 
-  biblioNetwork(M = wos_scopus$df, 
-                analysis = "co-occurrences", 
-                network = "keywords", 
-                sep = ";")
-
-plot_net_co_occurrence <- 
-  networkPlot(wos_scopus_co_occurrence, 
-              weighted=T, n = 30, 
-              Title = "Keyword Cooccurrences", 
-              type = "fruchterman", 
-              size=T,
-              edgesize = 5,
-              labelsize=0.7)
-```
-
-co-citation authors
-
-```{r}
-wos_scopus_metatag <- 
-  metaTagExtraction(wos_scopus$df, Field = "CR_AU")
-
-wos_scopus_co_citation <- 
-  biblioNetwork(M = wos_scopus_metatag, 
-                analysis = "co-citation", 
-                network = "authors")
-
-plot_net_co_citation <- 
-  networkPlot(wos_scopus_co_citation, 
-              weighted=T, 
-              n = 30, 
-              Title = "Keyword Cooccurrences", 
-              type = "fruchterman", 
-              size=T,
-              edgesize = 5,
-              labelsize=0.7)
-```
+# Otro
 
 ## Clustering analysis
 
