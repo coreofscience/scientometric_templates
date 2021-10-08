@@ -19,7 +19,7 @@ library(igraph)
 library(tidytext)
 library(wordcloud)
 library(rebus)
-library(lessr)
+library(ggrepel) # improve donut visualization
 ```
 
 # Data getting
@@ -73,10 +73,38 @@ other_languages <-
 languages <- 
   main_languages |> 
   bind_rows(other_languages) |> 
-  uncount(n) |> 
-  rename(language = LA)
+  mutate(percentage = n / sum(n),
+         percentage = round(percentage, digits = 2))
+```
 
-PieChart(data = languages, x = language)
+
+```{r}
+df <- languages |> 
+  rename(value = percentage, group = LA) |>
+  mutate(value = value * 100) |> 
+  select(value, group)
+
+df2 <- df %>% 
+  mutate(csum = rev(cumsum(rev(value))), 
+         pos = value/2 + lead(csum, 1),
+         pos = if_else(is.na(pos), value/2, pos))
+
+ggplot(df, aes(x = 2 , y = value, fill = fct_inorder(group))) +
+  geom_col(width = 1, color = 1) +
+  coord_polar(theta = "y") +
+  geom_label_repel(data = df2,
+                   aes(y = pos, label = paste0(value, "%")),
+                   size = 4.5, nudge_x = 1, show.legend = FALSE) +
+   theme(panel.background = element_blank(),
+        axis.line = element_blank(), 
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = 18)) +
+  labs(title = "Languages") +
+  guides(fill = guide_legend(title = "")) +
+  theme_void() +
+  xlim(0.5, 2.5)
 ```
 
 ## Figure 2. Scientific Production
