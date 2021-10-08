@@ -11,11 +11,8 @@ editor_options:
 library(tidyverse)
 library(tosr)
 library(bibliometrix)
-library(journalabbr)
-library(gt)
 library(lubridate)
 library(igraph)
-library(ggraph) # Pretty network visualization
 library(tidytext)
 library(wordcloud)
 library(rebus)
@@ -26,18 +23,18 @@ library(ggrepel) # improve donut visualization
 
 ```{r}
 wos_scopus_tos <- 
-  tosr::tosr_load("co_citation_title_222.txt",  # Create data from searches 
-                  "co_citation_title_395.bib")
+  tosr::tosr_load("DCA 467 15 July 2021.bib",  # Create data from searches 
+                  "DCA 467 15 July 2021.txt")
 
 tree_of_science <- 
-  tosr::tosR("co_citation_title_222.txt",  # Create data from searches 
-                  "co_citation_title_395.bib")
+  tosr::tosR("DCA 467 15 July 2021.bib",  # Create data from searches 
+             "DCA 467 15 July 2021.txt")
 
 wos <- 
-  bibliometrix::convert2df("co_citation_title_222.txt") # create dataframe from wos file
+  bibliometrix::convert2df("DCA 467 15 July 2021.txt") # create dataframe from wos file
 
 scopus <- 
-  bibliometrix::convert2df("co_citation_title_395.bib", # Create dataframe from scopus file
+  bibliometrix::convert2df("DCA 467 15 July 2021.bib", # Create dataframe from scopus file
                            dbsource = "scopus", 
                            format = "bibtex")
 
