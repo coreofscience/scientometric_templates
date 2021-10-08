@@ -11,10 +11,6 @@ editor_options:
 library(tidyverse)
 library(tosr)
 library(bibliometrix)
-library(devtools)
-if (!require(sjrdata)) {
-  devtools::install_github("ikashnitsky/sjrdata")
-}
 library(journalabbr)
 library(gt)
 library(lubridate)
@@ -30,18 +26,18 @@ library(ggrepel) # improve donut visualization
 
 ```{r}
 wos_scopus_tos <- 
-  tosr::tosr_load("DCA 467 15 July 2021.bib",  # Create data from searches 
-                  "DCA 467 15 July 2021.txt")
+  tosr::tosr_load("co_citation_title_222.txt",  # Create data from searches 
+                  "co_citation_title_395.bib")
 
 tree_of_science <- 
-  tosr::tosR("DCA 467 15 July 2021.bib",  # Create data from searches 
-                  "DCA 467 15 July 2021.txt")
+  tosr::tosR("co_citation_title_222.txt",  # Create data from searches 
+                  "co_citation_title_395.bib")
 
 wos <- 
-  bibliometrix::convert2df("DCA 467 15 July 2021.txt") # create dataframe from wos file
+  bibliometrix::convert2df("co_citation_title_222.txt") # create dataframe from wos file
 
 scopus <- 
-  bibliometrix::convert2df("DCA 467 15 July 2021.bib", # Create dataframe from scopus file
+  bibliometrix::convert2df("co_citation_title_395.bib", # Create dataframe from scopus file
                            dbsource = "scopus", 
                            format = "bibtex")
 
@@ -85,7 +81,7 @@ languages <-
          percentage = round(percentage, 
                             digits = 2) ) |> 
   rename(language = LA) |>
-  select(language, percentage)
+  select(language, percentage, count = n)
 
 languages
 ```
@@ -157,10 +153,12 @@ wos_scopus_total_annual_production <-
 
 figure_2_data <- 
   wos_scopus_total_annual_production |> 
+  mutate(PY = replace_na(PY, replace = 0)) |> 
   pivot_wider(names_from = ref_type, 
-              values_from = n)
+              values_from = n) |> 
+  arrange(desc(PY))
 
-figure_2_data
+figure_2_data 
 ```
 
 ```{r}
@@ -299,6 +297,7 @@ wos_scopus_total_journal <-
   mutate(percentage = total / table_1 |> pull(total),
          percentage = round(percentage, digits = 2))
 
+
 wos_scopus_total_journal
 ```
 
@@ -399,11 +398,38 @@ nodes <-
   left_join(wos_scopus_tos$nodes, 
             by = c("name" = "ID_TOS"))
 
-wos_scopus_citation_network <- 
+wos_scopus_citation_network_1 <- 
   wos_scopus_tos$graph |> 
   igraph::set.vertex.attribute(name = "full_name", 
                                index = V(wos_scopus_tos$graph)$name, 
                                value = nodes$CITE)
+
+nodes_1 <- 
+  tibble(name = V(wos_scopus_citation_network_1)$name,
+         cluster = V(wos_scopus_citation_network_1)$subfield,
+         full_name = V(wos_scopus_citation_network_1)$full_name)
+  
+nodes_2 <- 
+  nodes_1 |> 
+  count(cluster, sort = TRUE) |> 
+  mutate(cluster_1 = row_number()) |> 
+  select(cluster, cluster_1)
+
+nodes_3 <- 
+  nodes_1 |> 
+  left_join(nodes_2) |> 
+  rename(subfield = cluster_1) |> 
+  select(name, full_name, subfield)
+
+edge_list <- 
+  get.edgelist(wos_scopus_citation_network_1) |> 
+  data.frame() |> 
+  rename(Source = X1, Target = X2)
+
+wos_scopus_citation_network <- 
+  graph.data.frame(d = edge_list, 
+                   directed = FALSE, 
+                   vertices = nodes_3)
 
 wos_scopus_citation_network |> 
   summary()
@@ -426,10 +452,10 @@ Removing not chosen clusters
 ```{r}
 wos_scopus_citation_network_clusters <- 
   wos_scopus_citation_network |> 
-  delete.vertices(which(V(wos_scopus_citation_network)$subfield != 14 & # filter clusters 
-                          V(wos_scopus_citation_network)$subfield != 4 &
-                          V(wos_scopus_citation_network)$subfield != 9  &
-                          V(wos_scopus_citation_network)$subfield != 5))
+  delete.vertices(which(V(wos_scopus_citation_network)$subfield != 1 & # filter clusters 
+                          V(wos_scopus_citation_network)$subfield != 2 &
+                          V(wos_scopus_citation_network)$subfield != 3  &
+                          V(wos_scopus_citation_network)$subfield != 4))
 
 wos_scopus_citation_network_clusters |> 
   summary()
@@ -447,7 +473,7 @@ nodes_full_data <-
 
 cluster_1 <- 
   wos_scopus_citation_network |> 
-  delete.vertices(which(V(wos_scopus_citation_network)$subfield != 14))
+  delete.vertices(which(V(wos_scopus_citation_network)$subfield != 1))
 
 cluster_1_page_rank <- 
   cluster_1 |> 
@@ -459,8 +485,9 @@ cluster_1_df <-
          full_name = V(cluster_1_page_rank)$full_name,
          page_rank = V(cluster_1_page_rank)$page_rank,
          cluster = V(cluster_1_page_rank)$subfield,)
+
 nodes_full_data |> 
-  filter(cluster == 14) |> 
+  filter(cluster == 1) |> 
   select(full_name) |> 
   mutate(full_name = str_extract(full_name, SPC %R%  # Regular expressions 
                                    one_or_more(WRD) %R% 
@@ -473,6 +500,8 @@ nodes_full_data |>
          full_name = str_trim(full_name))  |> 
   unnest_tokens(output = word, input = full_name) |> # Tokenization
   anti_join(stop_words) |>  # Removing stop words
+   filter(word != "doi",
+         !str_detect(word, "[0-9]")) |>  # WoS data
   filter(word == str_remove(word, pattern = "citation"),
          word == str_remove(word, pattern = "research"),  # Words removed
          word == str_remove(word, pattern = "analysis"), 
@@ -492,7 +521,7 @@ nodes_full_data |>
 ```{r}
 cluster_2 <- 
   wos_scopus_citation_network |> 
-  delete.vertices(which(V(wos_scopus_citation_network)$subfield != 4))
+  delete.vertices(which(V(wos_scopus_citation_network)$subfield != 2))
 
 cluster_2_page_rank <- 
   cluster_2 |> 
@@ -506,7 +535,7 @@ cluster_2_df <-
          cluster = V(cluster_2_page_rank)$subfield,)
 
 nodes_full_data |> 
-  filter(cluster == 4) |> 
+  filter(cluster == 2) |> 
   select(full_name) |> 
   mutate(full_name = str_extract(full_name, SPC %R%  # Regular expressions 
                                    one_or_more(WRD) %R% 
@@ -518,7 +547,9 @@ nodes_full_data |>
                                   one_or_more(or(WRD,ANY_CHAR))),
          full_name = str_trim(full_name))  |> 
   unnest_tokens(output = word, input = full_name) |> 
-  anti_join(stop_words) |> 
+  anti_join(stop_words) |>
+  filter(word != "doi",
+         !str_detect(word, "[0-9]")) |>  # WoS data
   filter(word == str_remove(word, pattern = "citation"),
          word == str_remove(word, pattern = "research"), 
          word == str_remove(word, pattern = "analysis"), 
@@ -539,7 +570,7 @@ nodes_full_data |>
 
 cluster_3 <- 
   wos_scopus_citation_network |> 
-  delete.vertices(which(V(wos_scopus_citation_network)$subfield != 9))
+  delete.vertices(which(V(wos_scopus_citation_network)$subfield != 3))
 
 cluster_3_page_rank <- 
   cluster_3 |> 
@@ -553,7 +584,7 @@ cluster_3_df <-
          cluster = V(cluster_3_page_rank)$subfield,)
 
 nodes_full_data |> 
-  filter(cluster == 9) |> 
+  filter(cluster == 3) |> 
   select(full_name) |> 
   mutate(full_name = str_extract(full_name, SPC %R%  # Regular expressions 
                                    one_or_more(WRD) %R% 
@@ -565,7 +596,9 @@ nodes_full_data |>
                                   one_or_more(or(WRD,ANY_CHAR))),
          full_name = str_trim(full_name))  |> 
   unnest_tokens(output = word, input = full_name) |> 
-  anti_join(stop_words) |> 
+  anti_join(stop_words) |>
+   filter(word != "doi",
+         !str_detect(word, "[0-9]")) |>  # WoS data 
   filter(word == str_remove(word, pattern = "citation"),
          word == str_remove(word, pattern = "research"), 
          word == str_remove(word, pattern = "analysis"), 
@@ -585,7 +618,7 @@ nodes_full_data |>
 
 cluster_4 <- 
   wos_scopus_citation_network |> 
-  delete.vertices(which(V(wos_scopus_citation_network)$subfield != 5))
+  delete.vertices(which(V(wos_scopus_citation_network)$subfield != 4))
 
 cluster_4_page_rank <- 
   cluster_4 |> 
@@ -599,7 +632,7 @@ cluster_4_df <-
          cluster = V(cluster_4_page_rank)$subfield,)
 
 nodes_full_data |> 
-  filter(cluster == 5) |> 
+  filter(cluster == 4) |> 
   select(full_name) |> 
   mutate(full_name = str_extract(full_name, SPC %R%  # Regular expressions 
                                    one_or_more(WRD) %R% 
@@ -612,12 +645,14 @@ nodes_full_data |>
          full_name = str_trim(full_name))  |> 
   unnest_tokens(output = word, input = full_name) |> 
   anti_join(stop_words) |> 
+   filter(word != "doi",
+         !str_detect(word, "[0-9]")) |>  # WoS data
   filter(word == str_remove(word, pattern = "citation"),
          word == str_remove(word, pattern = "research"), 
          word == str_remove(word, pattern = "analysis"), 
          word == str_remove(word, pattern = "science"),
          word == str_remove(word, pattern = "scientometric"),
-         word == str_remove(word, pattern = "bibliometric")) |>
+         word == str_remove(word, pattern = "res")) |>
   count(word, sort = TRUE) |> 
   with(wordcloud(word, 
                  n, 
