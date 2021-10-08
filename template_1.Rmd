@@ -11,7 +11,10 @@ editor_options:
 library(tidyverse)
 library(tosr)
 library(bibliometrix)
-library(sjrdata)
+library(devtools)
+if (!require(sjrdata)) {
+  devtools::install_github("ikashnitsky/sjrdata")
+}
 library(journalabbr)
 library(gt)
 library(lubridate)
