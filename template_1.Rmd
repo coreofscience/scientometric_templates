@@ -19,26 +19,36 @@ library(rebus)
 library(ggrepel) # improve donut visualization
 ```
 
+This template is based in this paper
+
+https://revistas.ucm.es/index.php/REVE/article/view/75566/4564456557467
+
+For a detail explanation of how to use it, please watch this video 
+
+https://www.youtube.com/watch?v=jtKSifvNvTM
+
+
 # Data getting
 
 ```{r}
 wos_scopus_tos <- 
-  tosr::tosr_load("DCA 467 15 July 2021.bib",  # Create data from searches 
-                  "DCA 467 15 July 2021.txt")
+  tosr::tosr_load("co_citation_analysis_1_1224.bib",  # Create data from searches   
+                  "co_citation_analysis_1_500.txt", 
+                  "co_citation_analysis_501_808.txt")
 
 tree_of_science <- 
-  tosr::tosR("DCA 467 15 July 2021.bib",  # Create data from searches 
-             "DCA 467 15 July 2021.txt")
+  tosr::tosR("co_citation_analysis_1_1224.bib",  # Create data from searches   
+             "co_citation_analysis_1_500.txt", 
+             "co_citation_analysis_501_808.txt")
 
 wos <- 
-  bibliometrix::convert2df("DCA 467 15 July 2021.txt") # create dataframe from wos file
+  bibliometrix::convert2df(c("co_citation_analysis_1_500.txt", 
+                             "co_citation_analysis_501_808.txt"))  # create dataframe from wos file
 
 scopus <- 
-  bibliometrix::convert2df("DCA 467 15 July 2021.bib", # Create dataframe from scopus file
+  bibliometrix::convert2df("co_citation_analysis_1_1224.bib", # Create dataframe from scopus file
                            dbsource = "scopus", 
                            format = "bibtex")
-
-
 ```
 
 ## Table 1. Search Criteria
@@ -101,7 +111,7 @@ ggplot(df, aes(x = 2 , y = value, fill = fct_inorder(group))) +
   geom_label_repel(data = df2,
                    aes(y = pos, label = paste0(value, "%")),
                    size = 4.5, nudge_x = 1, show.legend = FALSE) +
-   theme(panel.background = element_blank(),
+  theme(panel.background = element_blank(),
         axis.line = element_blank(), 
         axis.text = element_blank(),
         axis.ticks = element_blank(),
@@ -190,7 +200,7 @@ scopus_country <-
   arrange(desc(papers)) 
 
 data_biblio_total <- biblioAnalysis(wos_scopus_tos$df)
-  
+
 total_country <- 
   data_biblio_total$Countries |> 
   data.frame() |> 
@@ -390,23 +400,23 @@ tree_of_science
 Finding the clusters
 
 ```{r}
-nodes <-  
+nodes <-  # Create a dataframe with the fullname of articles 
   tibble(name = V(wos_scopus_tos$graph)$name) |> 
   left_join(wos_scopus_tos$nodes, 
             by = c("name" = "ID_TOS"))
 
-wos_scopus_citation_network_1 <- 
+wos_scopus_citation_network_1 <- # Add the article names to the citation network
   wos_scopus_tos$graph |> 
   igraph::set.vertex.attribute(name = "full_name", 
                                index = V(wos_scopus_tos$graph)$name, 
                                value = nodes$CITE)
 
-nodes_1 <- 
+nodes_1 <- # Create a dataframe with subfields (clusters)
   tibble(name = V(wos_scopus_citation_network_1)$name,
          cluster = V(wos_scopus_citation_network_1)$subfield,
          full_name = V(wos_scopus_citation_network_1)$full_name)
-  
-nodes_2 <- 
+
+nodes_2 <- # Count the number of articles per cluster
   nodes_1 |> 
   count(cluster, sort = TRUE) |> 
   mutate(cluster_1 = row_number()) |> 
@@ -425,7 +435,7 @@ edge_list <-
 
 wos_scopus_citation_network <- 
   graph.data.frame(d = edge_list, 
-                   directed = FALSE, 
+                   directed = TRUE, 
                    vertices = nodes_3)
 
 wos_scopus_citation_network |> 
@@ -433,6 +443,10 @@ wos_scopus_citation_network |>
 ```
 
 Choosing clusters
+
+We proposed the tipping point option to choose the number of clusters. See this paper:
+
+https://www.nature.com/articles/s41598-021-85041-8
 
 ```{r}
 clusters <- 
@@ -497,14 +511,14 @@ nodes_full_data |>
          full_name = str_trim(full_name))  |> 
   unnest_tokens(output = word, input = full_name) |> # Tokenization
   anti_join(stop_words) |>  # Removing stop words
-   filter(word != "doi",
+  filter(word != "doi",
          !str_detect(word, "[0-9]")) |>  # WoS data
   filter(word == str_remove(word, pattern = "citation"),
          word == str_remove(word, pattern = "research"),  # Words removed
          word == str_remove(word, pattern = "analysis"), 
          word == str_remove(word, pattern = "science"),
          word == str_remove(word, pattern = "scientometric"),
-         word == str_remove(word, pattern = "bibliometric")) |>
+         word == str_remove(word, pattern = "vulnerability")) |>
   count(word, sort = TRUE) |> 
   with(wordcloud(word, 
                  n, 
@@ -552,7 +566,7 @@ nodes_full_data |>
          word == str_remove(word, pattern = "analysis"), 
          word == str_remove(word, pattern = "science"),
          word == str_remove(word, pattern = "scientometric"),
-         word == str_remove(word, pattern = "bibliometric")) |>
+         word == str_remove(word, pattern = "vulnerability")) |>
   count(word, sort = TRUE) |> 
   with(wordcloud(word, 
                  n, 
@@ -594,14 +608,14 @@ nodes_full_data |>
          full_name = str_trim(full_name))  |> 
   unnest_tokens(output = word, input = full_name) |> 
   anti_join(stop_words) |>
-   filter(word != "doi",
+  filter(word != "doi",
          !str_detect(word, "[0-9]")) |>  # WoS data 
   filter(word == str_remove(word, pattern = "citation"),
          word == str_remove(word, pattern = "research"), 
          word == str_remove(word, pattern = "analysis"), 
          word == str_remove(word, pattern = "science"),
          word == str_remove(word, pattern = "scientometric"),
-         word == str_remove(word, pattern = "bibliometric")) |>
+         word == str_remove(word, pattern = "vulnerability")) |>
   count(word, sort = TRUE) |> 
   with(wordcloud(word, 
                  n, 
@@ -642,14 +656,14 @@ nodes_full_data |>
          full_name = str_trim(full_name))  |> 
   unnest_tokens(output = word, input = full_name) |> 
   anti_join(stop_words) |> 
-   filter(word != "doi",
+  filter(word != "doi",
          !str_detect(word, "[0-9]")) |>  # WoS data
   filter(word == str_remove(word, pattern = "citation"),
          word == str_remove(word, pattern = "research"), 
          word == str_remove(word, pattern = "analysis"), 
          word == str_remove(word, pattern = "science"),
          word == str_remove(word, pattern = "scientometric"),
-         word == str_remove(word, pattern = "res")) |>
+         word == str_remove(word, pattern = "vulnerability")) |>
   count(word, sort = TRUE) |> 
   with(wordcloud(word, 
                  n, 
@@ -671,7 +685,7 @@ write_csv(wos_scopus_total_journal, "table_4.csv") # Exporting table 4
 write_csv(languages, "figure_1.csv") # Exporting data figure 1 
 write_csv(figure_2_data, "figure_2.csv") # Exporting data figure 2
 
-write.graph(wos_scopus_tos$graph, "citation_network_full.csv", "graphml") # Exporting graph
+write.graph(wos_scopus_citation_network, "citation_network_full.graphml", "graphml") # Exporting graph
 write.graph(wos_scopus_citation_network_clusters, 
             "wos_scopus_citation_network_clusters.graphml", 
             "graphml")
