@@ -17,6 +17,8 @@ library(tidytext)
 library(wordcloud)
 library(rebus)
 library(ggrepel) # improve donut visualization
+library(ggraph)
+library(visNetwork)
 ```
 
 This template is based in this paper
@@ -26,7 +28,6 @@ https://revistas.ucm.es/index.php/REVE/article/view/75566/4564456557467
 For a detail explanation of how to use it, please watch this video 
 
 https://www.youtube.com/watch?v=jtKSifvNvTM
-
 
 # Data getting
 
@@ -324,13 +325,126 @@ wos_scopus_author_co_citation_matrix <-
 plot_net_author_co_citation <- 
   networkPlot(wos_scopus_author_co_citation_matrix, 
               weighted=T, 
-              n = 30, 
+              n = 60, 
               Title = "Author Co-citation Network", 
               type = "fruchterman", 
               size=T,
               edgesize = 5,
               labelsize=0.7)
+
+ggraph(plot_net_author_co_citation$graph, layout = "drl") +
+  geom_edge_link(aes(alpha = weight)) +
+  geom_node_point(aes(size = size, color = community))
 ```
+
+```{r}
+wos_scopus_author_co_citation_graph <- 
+  wos_scopus_author_co_citation_matrix |> 
+  graph_from_adjacency_matrix(mode = "undirected", weighted = TRUE) |> 
+  simplify()
+```
+
+
+
+```{r}
+data <- toVisNetworkData(plot_net_author_co_citation$graph)
+
+visNetwork(nodes = data$nodes, 
+           edges = data$edges) |> 
+  visIgraphLayout(randomSeed = 123)
+
+```
+
+```{r}
+visIgraph(plot_net_author_co_citation$graph)
+```
+
+```{r}
+
+netLayout <- function(type){
+  switch(type,
+         auto={l <- "layout_nicely"},
+         circle={l <- "layout_in_circle"},
+         mds={l <- "layout_with_mds"},
+         star={l <- "layout_as_star"},
+         
+         sphere={l <- "layout_on_sphere"},
+         fruchterman={l <- "layout_with_fr"},
+         kamada={l <- "layout_with_kk"}
+  )
+  return(l)
+}
+
+igraph2vis<-function(g,curved,labelsize,opacity,type,shape, net, shadow=TRUE){
+  
+  LABEL=igraph::V(g)$name
+  
+  LABEL[igraph::V(g)$labelsize==0]=""
+  
+  vn <- toVisNetworkData(g)
+  
+  vn$nodes$label=LABEL
+  vn$edges$num=1
+  vn$edges$dashes=FALSE
+  vn$edges$dashes[vn$edges$lty==2]=TRUE
+  
+  ## opacity
+  vn$nodes$color=adjustcolor(vn$nodes$color,alpha=min(c(opacity+0.2,1)))
+  vn$edges$color=adjustcolor(vn$edges$color,alpha=opacity)
+  
+  ## removing multiple edges
+  vn$edges=unique(vn$edges)
+  
+  ## labelsize
+  scalemin=20
+  scalemax=150
+  Min=min(vn$nodes$font.size)
+  Max=max(vn$nodes$font.size)
+  if (Max>Min){
+    size=(vn$nodes$font.size-Min)/(Max-Min)*15*labelsize+10
+  } else {size=10*labelsize}
+  size[size<scalemin]=scalemin
+  size[size>scalemax]=scalemax
+  vn$nodes$font.size=size
+  l<-netLayout(type)
+  
+  ### TO ADD SHAPE AND FONT COLOR OPTIONS
+  coords <- net$layout
+  
+  vn$nodes$size <- vn$nodes$font.size*0.8
+  
+  if (shape %in% c("text")){
+    vn$nodes$font.color <- vn$nodes$color
+  }else{
+    vn$nodes$font.color <- "black"
+  }
+  
+  if (shape %in% c("dot","square")){
+    vn$nodes$font.vadjust <- -0.7*vn$nodes$font.size
+  }else{
+    vn$nodes$font.vadjust <-0
+  }
+  
+  VIS<-
+    visNetwork(nodes = vn$nodes, edges = vn$edges, type="full", smooth=TRUE, physics=FALSE) %>%
+    #visNodes(shape=shape, font=list(color="black")) %>%
+    visNodes(shadow=NULL, shape=NULL, 
+             font=list(color="black", 
+                       size=vn$nodes$font.size,
+                       vadjust=vn$nodes$font.vadjust)) %>%
+    visIgraphLayout(layout = "layout.norm", layoutMatrix = coords) %>%
+    visEdges(smooth = curved) %>%
+    visOptions(highlightNearest =list(enabled = T, hover = T, degree=1), nodesIdSelection = T) %>%
+    visInteraction(dragNodes = TRUE, navigationButtons = TRUE, hideEdgesOnDrag = TRUE) %>%
+    visOptions(manipulation = TRUE) %>%
+    visExport(type = "png", name = "network",
+              label = paste0("Export graph as png"), background = "#fff",
+              float = "right", style = NULL, loadDependencies = TRUE)
+  values$COCVIS=VIS
+  return(list(VIS=VIS,vn=vn, type=type, l=l, curved=curved))
+}
+```
+
 
 ### Author Collaboration network
 
