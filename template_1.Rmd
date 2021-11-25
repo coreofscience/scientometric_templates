@@ -32,21 +32,16 @@ https://www.youtube.com/watch?v=jtKSifvNvTM
 
 ```{r}
 wos_scopus_tos <- 
-  tosr::tosr_load("co_citation_analysis_1_1224.bib",  # Create data from searches   
-                  "co_citation_analysis_1_500.txt", 
-                  "co_citation_analysis_501_808.txt")
+  tosr::tosr_load("scopus (1).bib", "savedrecs (1).txt")
 
 tree_of_science <- 
-  tosr::tosR("co_citation_analysis_1_1224.bib",  # Create data from searches   
-             "co_citation_analysis_1_500.txt", 
-             "co_citation_analysis_501_808.txt")
+  tosr::tosR("scopus (1).bib", "savedrecs (1).txt")
 
 wos <- 
-  bibliometrix::convert2df(c("co_citation_analysis_1_500.txt", 
-                             "co_citation_analysis_501_808.txt"))  # create dataframe from wos file
+  bibliometrix::convert2df("savedrecs (1).txt")  # create dataframe from wos file
 
 scopus <- 
-  bibliometrix::convert2df("co_citation_analysis_1_1224.bib", # Create dataframe from scopus file
+  bibliometrix::convert2df("scopus (1).bib", # Create dataframe from scopus file
                            dbsource = "scopus", 
                            format = "bibtex")
 ```
@@ -265,7 +260,6 @@ wos_scopus_authors
 ```{r}
 wos_journal <- 
   wos |> 
-  filter(str_detect(DT, "ARTICLE")) |> 
   select(journal = SO) |> 
   na.omit() |> 
   count(journal, sort = TRUE) |> 
@@ -275,7 +269,6 @@ wos_journal <-
 
 scopus_journal <- 
   scopus |> 
-  filter(str_detect(DT, "ARTICLE")) |> 
   select(journal = SO) |> 
   na.omit() |> 
   count(journal, sort = TRUE) |> 
@@ -285,7 +278,6 @@ scopus_journal <-
 
 total_journal <- 
   wos_scopus_tos$df |> 
-  filter(str_detect(DT, "ARTICLE")) |> 
   select(journal = SO) |> 
   na.omit() |> 
   count(journal, sort = TRUE) |> 
