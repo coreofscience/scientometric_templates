@@ -17,6 +17,10 @@ library(tidytext)
 library(wordcloud)
 library(rebus)
 library(ggrepel) # improve donut visualization
+library(ggraph)
+library(visNetwork) 
+library(tidygraph)
+library(jhcutils)
 ```
 
 This template is based in this paper
@@ -26,7 +30,6 @@ https://revistas.ucm.es/index.php/REVE/article/view/75566/4564456557467
 For a detail explanation of how to use it, please watch this video 
 
 https://www.youtube.com/watch?v=jtKSifvNvTM
-
 
 # Data getting
 
@@ -321,15 +324,43 @@ wos_scopus_author_co_citation_matrix <-
                 analysis = "co-citation", 
                 network = "authors")
 
-plot_net_author_co_citation <- 
-  networkPlot(wos_scopus_author_co_citation_matrix, 
-              weighted=T, 
-              n = 30, 
-              Title = "Author Co-citation Network", 
-              type = "fruchterman", 
-              size=T,
-              edgesize = 5,
-              labelsize=0.7)
+aca_tbl_graph <- 
+  graph_from_adjacency_matrix(wos_scopus_author_co_citation_matrix , 
+                              mode = "undirected", 
+                              weighted = TRUE, 
+                              diag = FALSE) |> 
+  as_tbl_graph(aca_igraph, directed = FALSE ) |> 
+  activate(nodes) |> 
+  mutate(degree = centrality_degree()) |> 
+  arrange(desc(degree)) |> 
+  slice(1:30)
+
+weight_tbl <- 
+  aca_tbl_graph |> 
+  activate(edges) |> 
+  select(weight) |> 
+  as.data.frame()
+
+threshold <- 
+  quantile(weight_tbl |> 
+             select(weight) |> 
+             pull(), 
+           probs = 0.80)
+
+aca_tbl_graph |> 
+  activate(edges) |> 
+  filter(weight >= threshold) |> 
+  activate(nodes) |>  
+  jhcutils::get_giant_component() |> 
+  mutate(degree = centrality_degree(),
+         community = as.factor(group_louvain()) ) |> 
+  ggraph(layout = "graphopt") + 
+  geom_edge_link(alpha = .25, 
+                 aes(width = weight)) +
+  geom_node_point(aes(colour = community, 
+                      size = degree)) +
+  geom_node_text(aes(label = name), repel = TRUE) +
+  theme_graph()
 ```
 
 ### Author Collaboration network
