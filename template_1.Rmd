@@ -379,6 +379,42 @@ plot_author_collab <-
               size=T,
               edgesize = 5,
               labelsize=0.7)
+
+acollab_tbl_graph <- 
+  graph_from_adjacency_matrix(wos_scopus_author_collab_matrix , 
+                              mode = "undirected", 
+                              weighted = TRUE, 
+                              diag = FALSE) |> 
+  as_tbl_graph(aca_igraph, directed = FALSE ) |> 
+  activate(nodes) |> 
+  mutate(degree = centrality_degree()) |> 
+  arrange(desc(degree)) |> 
+  slice(1:30)
+
+weight_tbl <- 
+  acollab_tbl_graph |> 
+  activate(edges) |> 
+  select(weight) |> 
+  as.data.frame()
+
+acollab_tbl_graph_filtered <- 
+  acollab_tbl_graph |> 
+  activate(edges) |> 
+  filter(weight > 1) |> 
+  activate(nodes) |> 
+  mutate(components = group_components(type = "weak")) |>
+  filter(components == 1) |>
+  mutate(degree = centrality_degree(),
+         community = as.factor(group_louvain()) )
+
+acollab_tbl_graph_filtered |> 
+  ggraph(layout = "kk") + 
+  geom_edge_link(alpha = .25, 
+                 aes(width = weight)) +
+  geom_node_point(aes(colour = community, 
+                      size = degree)) +
+  geom_node_text(aes(label = name), repel = TRUE) +
+  theme_graph()
 ```
 
 ### Country Collaboration Network
