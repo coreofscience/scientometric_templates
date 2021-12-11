@@ -20,11 +20,6 @@ library(ggrepel) # improve donut visualization
 library(ggraph)
 library(visNetwork) 
 library(tidygraph)
-<<<<<<< HEAD
-library(jhcutils)
-library(CINNA)
-=======
->>>>>>> 6284416455470a89ef507b7ee62d6254100986d8
 ```
 
 This template is based in this paper
@@ -356,7 +351,7 @@ aca_tbl_graph |>
   filter(components == 1) |> 
   mutate(degree = centrality_degree(),
          community = as.factor(group_louvain()) ) |> 
-  ggraph(layout = "graphopt") + 
+  ggraph(layout = "kk") + 
   geom_edge_link(alpha = .25, 
                  aes(width = weight)) +
   geom_node_point(aes(colour = community, 
