@@ -20,7 +20,6 @@ library(ggrepel) # improve donut visualization
 library(ggraph)
 library(visNetwork) 
 library(tidygraph)
-library(jhcutils)
 ```
 
 This template is based in this paper
