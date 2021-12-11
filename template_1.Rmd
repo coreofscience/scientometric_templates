@@ -707,6 +707,8 @@ nodes_full_data |>
 
 ```{r}
 
+write_csv(wos_scopus_tos$df, "wos_scopus_tos.csv") # Exporting all data merged
+
 write_csv(table_1, "table_1.csv") # Exporting table 1
 write_csv(wos_scopus_total_country, "table_2_.csv")  # Exporting table 2
 write_csv(wos_scopus_authors, "table_3.csv") # Exporting table 3
@@ -738,7 +740,7 @@ aca_graphml <-
                         directed = FALSE, 
                         vertices = aca_graphml_nodes)
 
-write_graph(aca_graphml, "aca_graph.graphml", "graphml")
+write_graph(aca_graphml, "aca_graph.graphml", "graphml") # Export author co-citation graph
 
 write.csv(tree_of_science, "tree_of_science.csv") # Exporting Tree of Science
 
