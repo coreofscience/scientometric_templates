@@ -457,7 +457,7 @@ country_collab_tbl_graph_filtered |>
   theme_graph()
 ```
 
-### Keyword co-citation network
+### Keyword co-occurrence network
 
 ```{r}
 wos_scopus_keyword_co_occurrence_matrix <- 
@@ -474,6 +474,48 @@ plot_net_co_occurrence <-
               size=T,
               edgesize = 5,
               labelsize=0.7)
+
+keyword_co_occurrence_tbl_graph <- 
+  graph_from_adjacency_matrix(wos_scopus_keyword_co_occurrence_matrix , 
+                              mode = "undirected", 
+                              weighted = TRUE, 
+                              diag = FALSE) |> 
+  as_tbl_graph(aca_igraph, directed = FALSE ) |> 
+  activate(nodes) |> 
+  mutate(degree = centrality_degree()) |> 
+  arrange(desc(degree)) |> 
+  slice(1:30)
+
+keyword_co_occurrence_weight_tbl <- 
+  keyword_co_occurrence_tbl_graph |> 
+  activate(edges) |> 
+  select(weight) |> 
+  as.data.frame()
+
+threshold <- 
+  quantile(keyword_co_occurrence_weight_tbl |> 
+             select(weight) |> 
+             pull(), 
+           probs = 0.80)
+
+keyword_co_occurrence_tbl_graph_filtered <- 
+  keyword_co_occurrence_tbl_graph |> 
+  activate(edges) |> 
+  filter(weight >= threshold) |> 
+  activate(nodes) |> 
+  mutate(components = group_components(type = "weak")) |> 
+  filter(components == 1) |> 
+  mutate(degree = centrality_degree(),
+         community = as.factor(group_louvain()) )
+
+keyword_co_occurrence_tbl_graph_filtered |> 
+  ggraph(layout = "kk") + 
+  geom_edge_link(alpha = .25, 
+                 aes(width = weight)) +
+  geom_node_point(aes(colour = community, 
+                      size = degree)) +
+  geom_node_text(aes(label = name), repel = TRUE) +
+  theme_graph()
 ```
 
 ## Figure 4. Tree of Science
@@ -836,7 +878,7 @@ country_collab_graphml <-
                         directed = FALSE, 
                         vertices = country_collab_graphml_nodes)
 
-write_graph(author_collab_graphml, "author_collab_graphml.graphml", "graphml") # Export author co-citation graph
+write_graph(country_collab_graphml, "country_collab_graphml.graphml", "graphml") # Export author co-citation graph
 
 write.csv(tree_of_science, "tree_of_science.csv") # Exporting Tree of Science
 
