@@ -380,7 +380,7 @@ plot_author_collab <-
               edgesize = 5,
               labelsize=0.7)
 
-acollab_tbl_graph <- 
+author_collab_tbl_graph <- 
   graph_from_adjacency_matrix(wos_scopus_author_collab_matrix , 
                               mode = "undirected", 
                               weighted = TRUE, 
@@ -391,14 +391,8 @@ acollab_tbl_graph <-
   arrange(desc(degree)) |> 
   slice(1:30)
 
-weight_tbl <- 
-  acollab_tbl_graph |> 
-  activate(edges) |> 
-  select(weight) |> 
-  as.data.frame()
-
-acollab_tbl_graph_filtered <- 
-  acollab_tbl_graph |> 
+author_collab_tbl_graph_filtered <- 
+  author_collab_tbl_graph |> 
   activate(edges) |> 
   filter(weight > 1) |> 
   activate(nodes) |> 
@@ -407,7 +401,7 @@ acollab_tbl_graph_filtered <-
   mutate(degree = centrality_degree(),
          community = as.factor(group_louvain()) )
 
-acollab_tbl_graph_filtered |> 
+author_collab_tbl_graph_filtered |> 
   ggraph(layout = "kk") + 
   geom_edge_link(alpha = .25, 
                  aes(width = weight)) +
@@ -763,7 +757,7 @@ aca_graphml_nodes <-
   aca_tbl_graph_filtered |> 
   activate(nodes) |> 
   as_tibble() |> 
-  select(author = name) |> 
+  rename(author = name) |> 
   rownames_to_column("name")
 
 aca_graphml_edges <- 
@@ -777,6 +771,25 @@ aca_graphml <-
                         vertices = aca_graphml_nodes)
 
 write_graph(aca_graphml, "aca_graph.graphml", "graphml") # Export author co-citation graph
+
+author_collab_graphml_nodes <- 
+  author_collab_tbl_graph_filtered |> 
+  activate(nodes) |> 
+  as_tibble() |> 
+  rename(author = name) |> 
+  rownames_to_column("name")
+
+author_collab_graphml_edges <- 
+  author_collab_tbl_graph_filtered |> 
+  activate(edges) |> 
+  as_tibble() 
+
+author_collab_graphml <- 
+  graph_from_data_frame(d = author_collab_graphml_edges, 
+                        directed = FALSE, 
+                        vertices = author_collab_graphml_nodes)
+
+write_graph(author_collab_graphml, "author_collab_graphml.graphml", "graphml") # Export author co-citation graph
 
 write.csv(tree_of_science, "tree_of_science.csv") # Exporting Tree of Science
 
