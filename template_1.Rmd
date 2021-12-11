@@ -34,16 +34,21 @@ https://www.youtube.com/watch?v=jtKSifvNvTM
 
 ```{r}
 wos_scopus_tos <- 
-  tosr::tosr_load("scopus (1).bib", "savedrecs (1).txt")
+  tosr::tosr_load("co_citation_analysis_1_1224.bib", 
+                  "co_citation_analysis_1_500.txt", 
+                  "co_citation_analysis_501_808.txt")
 
 tree_of_science <- 
-  tosr::tosR("scopus (1).bib", "savedrecs (1).txt")
+  tosr::tosR("co_citation_analysis_1_1224.bib", 
+             "co_citation_analysis_1_500.txt", 
+             "co_citation_analysis_501_808.txt")
 
 wos <- 
-  bibliometrix::convert2df("savedrecs (1).txt")  # create dataframe from wos file
+  bibliometrix::convert2df(c("co_citation_analysis_1_500.txt", 
+                             "co_citation_analysis_501_808.txt"))  # create dataframe from wos file
 
 scopus <- 
-  bibliometrix::convert2df("scopus (1).bib", # Create dataframe from scopus file
+  bibliometrix::convert2df("co_citation_analysis_1_1224.bib", # Create dataframe from scopus file
                            dbsource = "scopus", 
                            format = "bibtex")
 ```
