@@ -880,6 +880,25 @@ country_collab_graphml <-
 
 write_graph(country_collab_graphml, "country_collab_graphml.graphml", "graphml") # Export author co-citation graph
 
+keyword_co_occurrence_graphml_nodes <- 
+  keyword_co_occurrence_tbl_graph_filtered |> 
+  activate(nodes) |> 
+  as_tibble() |> 
+  rename(author = name) |> 
+  rownames_to_column("name")
+
+keyword_co_occurrence_graphml_edges <- 
+  keyword_co_occurrence_tbl_graph_filtered |> 
+  activate(edges) |> 
+  as_tibble()  
+
+keyword_co_occurrence_graphml <- 
+  graph_from_data_frame(d = keyword_co_occurrence_graphml_edges, 
+                        directed = FALSE, 
+                        vertices = keyword_co_occurrence_graphml_nodes)
+
+write_graph(keyword_co_occurrence_graphml, "keyword_co_occurrence_graphml.graphml", "graphml") # Export author co-citation graph
+
 write.csv(tree_of_science, "tree_of_science.csv") # Exporting Tree of Science
 
 write.csv(cluster_1_df, "cluster_1.csv") # Exporting cluster 1
