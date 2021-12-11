@@ -21,6 +21,7 @@ library(ggraph)
 library(visNetwork) 
 library(tidygraph)
 library(jhcutils)
+library(CINNA)
 ```
 
 This template is based in this paper
@@ -347,8 +348,9 @@ threshold <-
 aca_tbl_graph |> 
   activate(edges) |> 
   filter(weight >= threshold) |> 
-  activate(nodes) |>  
-  jhcutils::get_giant_component() |> 
+  activate(nodes) |> 
+  mutate(components = group_components(type = "weak")) |> 
+  filter(components == 1) |> 
   mutate(degree = centrality_degree(),
          community = as.factor(group_louvain()) ) |> 
   ggraph(layout = "graphopt") + 
