@@ -343,14 +343,17 @@ threshold <-
              pull(), 
            probs = 0.80)
 
-aca_tbl_graph |> 
+aca_tbl_graph_filtered <- 
+  aca_tbl_graph |> 
   activate(edges) |> 
   filter(weight >= threshold) |> 
   activate(nodes) |> 
   mutate(components = group_components(type = "weak")) |> 
   filter(components == 1) |> 
   mutate(degree = centrality_degree(),
-         community = as.factor(group_louvain()) ) |> 
+         community = as.factor(group_louvain()) )
+
+aca_tbl_graph_filtered |> 
   ggraph(layout = "kk") + 
   geom_edge_link(alpha = .25, 
                  aes(width = weight)) +
@@ -717,6 +720,25 @@ write.graph(wos_scopus_citation_network, "citation_network_full.graphml", "graph
 write.graph(wos_scopus_citation_network_clusters, 
             "wos_scopus_citation_network_clusters.graphml", 
             "graphml")
+
+aca_graphml_nodes <- 
+  aca_tbl_graph_filtered |> 
+  activate(nodes) |> 
+  as_tibble() |> 
+  select(author = name) |> 
+  rownames_to_column("name")
+
+aca_graphml_edges <- 
+  aca_tbl_graph_filtered |> 
+  activate(edges) |> 
+  as_tibble() 
+
+aca_graphml <- 
+  graph_from_data_frame(d = aca_graphml_edges, 
+                        directed = FALSE, 
+                        vertices = aca_graphml_nodes)
+
+write_graph(aca_graphml, "aca_graph.graphml", "graphml")
 
 write.csv(tree_of_science, "tree_of_science.csv") # Exporting Tree of Science
 
