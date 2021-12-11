@@ -20,8 +20,11 @@ library(ggrepel) # improve donut visualization
 library(ggraph)
 library(visNetwork) 
 library(tidygraph)
+<<<<<<< HEAD
 library(jhcutils)
 library(CINNA)
+=======
+>>>>>>> 6284416455470a89ef507b7ee62d6254100986d8
 ```
 
 This template is based in this paper
