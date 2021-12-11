@@ -427,6 +427,34 @@ plot_country_collab <-
               size=T,
               edgesize = 5,
               labelsize=0.7)
+
+country_collab_tbl_graph <- 
+  graph_from_adjacency_matrix(wos_scopus_country_collab_matrix , 
+                              mode = "undirected", 
+                              weighted = TRUE, 
+                              diag = FALSE) |> 
+  as_tbl_graph(aca_igraph, directed = FALSE ) |> 
+  activate(nodes) |> 
+  mutate(degree = centrality_degree()) |> 
+  arrange(desc(degree)) |> 
+  slice(1:30)
+
+country_collab_tbl_graph_filtered <- 
+  country_collab_tbl_graph |> 
+  activate(nodes) |> 
+  mutate(components = group_components(type = "weak")) |>
+  filter(components == 1) |>
+  mutate(degree = centrality_degree(),
+         community = as.factor(group_louvain()) )
+
+country_collab_tbl_graph_filtered |> 
+  ggraph(layout = "kk") + 
+  geom_edge_link(alpha = .25, 
+                 aes(width = weight)) +
+  geom_node_point(aes(colour = community, 
+                      size = degree)) +
+  geom_node_text(aes(label = name), repel = TRUE) +
+  theme_graph()
 ```
 
 ### Keyword co-citation network
@@ -788,6 +816,25 @@ author_collab_graphml <-
   graph_from_data_frame(d = author_collab_graphml_edges, 
                         directed = FALSE, 
                         vertices = author_collab_graphml_nodes)
+
+write_graph(author_collab_graphml, "author_collab_graphml.graphml", "graphml") # Export author co-citation graph
+
+country_collab_graphml_nodes <- 
+  country_collab_tbl_graph_filtered |> 
+  activate(nodes) |> 
+  as_tibble() |> 
+  rename(author = name) |> 
+  rownames_to_column("name")
+
+country_collab_graphml_edges <- 
+  country_collab_tbl_graph_filtered |> 
+  activate(edges) |> 
+  as_tibble() 
+
+country_collab_graphml <- 
+  graph_from_data_frame(d = country_collab_graphml_edges, 
+                        directed = FALSE, 
+                        vertices = country_collab_graphml_nodes)
 
 write_graph(author_collab_graphml, "author_collab_graphml.graphml", "graphml") # Export author co-citation graph
 
