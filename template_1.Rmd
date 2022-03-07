@@ -35,16 +35,21 @@ https://www.youtube.com/watch?v=jtKSifvNvTM
 
 ```{r}
 wos_scopus_tos <- 
-  tosr::tosr_load("scopus (1).bib", "savedrecs (1).txt")
+  tosr::tosr_load("co_citation_analysis_1_1224.bib", 
+                  "co_citation_analysis_1_500.txt", 
+                  "co_citation_analysis_501_808.txt")
 
 tree_of_science <- 
-  tosr::tosR("scopus (1).bib", "savedrecs (1).txt")
+  tosr::tosR("co_citation_analysis_1_1224.bib", 
+             "co_citation_analysis_1_500.txt", 
+             "co_citation_analysis_501_808.txt")
 
 wos <- 
-  bibliometrix::convert2df("savedrecs (1).txt")  # create dataframe from wos file
+  bibliometrix::convert2df(c("co_citation_analysis_1_500.txt", 
+                             "co_citation_analysis_501_808.txt"))  # create dataframe from wos file
 
 scopus <- 
-  bibliometrix::convert2df("scopus (1).bib", # Create dataframe from scopus file
+  bibliometrix::convert2df("co_citation_analysis_1_1224.bib", # Create dataframe from scopus file
                            dbsource = "scopus", 
                            format = "bibtex")
 ```
@@ -478,7 +483,13 @@ clusters <-
 
 clusters |> 
   ggplot(aes(x = reorder(cluster, n), y = n)) +
-  geom_point() 
+  geom_point(size = 3) +
+  labs(x = "Clusters", y = "Number of papers") +
+  theme(axis.title.x = element_text(size = 16 , 
+                                    family =  "Arial"),
+        axis.title.y = element_text(size = 16, family = "Arial"),
+        axis.text.x = element_text(size = 12, family = "Arial"), 
+        axis.text.y = element_text(size = 12, family = "Arial"))
 ```
 
 Removing not chosen clusters
@@ -541,7 +552,10 @@ nodes_full_data |>
          word == str_remove(word, pattern = "analysis"), 
          word == str_remove(word, pattern = "science"),
          word == str_remove(word, pattern = "scientometric"),
-         word == str_remove(word, pattern = "vulnerability")) |>
+         word == str_remove(word, pattern = "management"),
+         word == str_remove(word, pattern = "bibliometric"),
+         word == str_remove(word, pattern = "review"),
+         word == str_remove(word, pattern = "journal")) |>
   count(word, sort = TRUE) |> 
   with(wordcloud(word, 
                  n, 
@@ -634,11 +648,13 @@ nodes_full_data |>
   filter(word != "doi",
          !str_detect(word, "[0-9]")) |>  # WoS data 
   filter(word == str_remove(word, pattern = "citation"),
-         word == str_remove(word, pattern = "research"), 
-         word == str_remove(word, pattern = "analysis"), 
+         word == str_remove(word, pattern = "research"),
+         word == str_remove(word, pattern = "analysis"),
          word == str_remove(word, pattern = "science"),
          word == str_remove(word, pattern = "scientometric"),
-         word == str_remove(word, pattern = "vulnerability")) |>
+         word == str_remove(word, pattern = "vulnerability"),
+         word == str_remove(word, pattern = "journal"),
+         word == str_remove(word, pattern = "information")) |>
   count(word, sort = TRUE) |> 
   with(wordcloud(word, 
                  n, 
