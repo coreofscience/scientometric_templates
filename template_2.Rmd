@@ -1,0 +1,764 @@
+---
+title: "Análisis de la Producción científica de la UCLA"
+author: "Sebastian Robledo"
+date: "1/25/2022"
+output: 
+  html_document:
+            toc: TRUE
+            toc_float: TRUE
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Creating the environment
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(tidygraph)
+library(igraph)
+library(bibliometrix)
+library(tosr)
+library(here)
+library(lubridate)
+library(sjrdata)
+library(openxlsx)
+library(zoo)
+library(RSQLite)
+library(journalabbr)
+library(ggraph)
+library(openxlsx)
+
+giant.component <- function(graph) {
+  cl <- igraph::clusters(graph)
+  igraph::induced.subgraph(graph, 
+                           which(cl$membership == which.max(cl$csize)))
+}
+```
+
+# Data getting
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+wos_scopus_tos <- 
+  tosr::tosr_load("scientometrics.bib", 
+                  "scientometrics.txt")
+
+wos <- 
+  bibliometrix::convert2df("scientometrics.txt")  # create dataframe from wos file
+
+scopus <- 
+  bibliometrix::convert2df("scientometrics.bib", # Create dataframe from scopus file
+                           dbsource = "scopus", 
+                           format = "bibtex")
+```
+
+# Data tidying
+
+We will merge Scopus and WoS
+
+```{r}
+wos_scopus_unique <- 
+  scopus |> 
+  select(SR) |> 
+  bind_rows(wos |> 
+              select(SR)) |> 
+  unique() # There are 2042 unique registers
+```
+
+We add scopus and wos dataset
+
+```{r}
+wos_scopus_unique_scopus <- 
+  wos_scopus_unique |> 
+  left_join(scopus |> 
+              mutate(database = "scopus"), 
+            by = "SR") 
+wos_scopus_unique_wos <- 
+  wos_scopus_unique_scopus |>
+  filter(is.na(database)) |> 
+  select(SR) |> 
+  left_join(wos |> 
+              mutate(database = "wos"), 
+            by = "SR")
+```
+
+Unifying tags in scopus and wos
+
+```{r}
+wos_titles <- tibble(title = names(wos_scopus_unique_wos))
+scopus_titles <- tibble(title = names(wos_scopus_unique_scopus))
+unique_scopus_wos_titles <- inner_join(scopus_titles, wos_titles)
+```
+
+Selecting only unique tags in both datasets
+
+```{r}
+scopus_unique_titles <- 
+  wos_scopus_unique_scopus |> 
+  filter(!is.na(database)) |> 
+  select(unique_scopus_wos_titles |> 
+           pull())
+wos_unique_titles <- 
+  wos_scopus_unique_wos |> 
+  select(unique_scopus_wos_titles |> 
+           pull())
+```
+
+Merging both datasets scopus and wos
+
+```{r}
+scopus_wos_final <- 
+  scopus_unique_titles |> 
+  bind_rows(wos_unique_titles) # 2042 registers!!!!!
+```
+
+# Data analysis
+
+```{r}
+wos_anual_production <- 
+  wos |> 
+  select(PY) |> 
+  count(PY, sort = TRUE) |> 
+  na.omit() |> 
+  filter(PY >= 2000,
+         PY < year(today())) |> 
+  mutate(ref_type = "wos") 
+  
+scopus_anual_production  <- 
+  scopus |> 
+  select(PY) |> 
+  count(PY, sort = TRUE) |> 
+  na.omit() |> 
+  filter(PY >= 2000,
+         PY < year(today())) |>
+  mutate(ref_type = "scopus") 
+
+total_anual_production <- 
+  wos_scopus_tos$df |> 
+  select(PY) |> 
+  count(PY, sort = TRUE) |> 
+  na.omit() |> 
+  filter(PY >= 2000,
+         PY < year(today())) |>
+  mutate(ref_type = "total") |> 
+  arrange(desc(PY))
+
+wos_scopus_total_annual_production <- 
+  wos_anual_production |> 
+  bind_rows(scopus_anual_production,
+            total_anual_production) 
+
+# Checking results of total
+wos_scopus_total_annual_production_dummy <- 
+  total_anual_production |> 
+  rename(n_total = n,
+         ref_type_total = ref_type) |> 
+  left_join(wos_anual_production |> 
+              rename(n_wos = n,
+                     ref_type_wos = ref_type) ) |> 
+  left_join(scopus_anual_production |> 
+              rename(n_scopus = n,
+                     ref_type_scopus = ref_type)) |> 
+  mutate(total = if_else(n_total < n_wos | n_total < n_scopus, 
+                         n_scopus, # it could be improved
+                         n_total))
+
+wos_scopus_total_annual_production_total <- 
+  wos_scopus_total_annual_production_dummy |> 
+  select(PY, 
+         n = total,
+         ref_type = ref_type_total)
+
+wos_scopus_total_annual_production_scopus <- 
+  wos_scopus_total_annual_production_dummy |> 
+  select(PY, 
+         n = n_scopus,
+         ref_type = ref_type_scopus)
+
+wos_scopus_total_annual_production_wos <- 
+  wos_scopus_total_annual_production_dummy |> 
+  select(PY, 
+         n = n_wos,
+         ref_type = ref_type_wos)
+
+wos_scopus_total_annual_production <- 
+  wos_scopus_total_annual_production_total |> 
+  bind_rows(wos_scopus_total_annual_production_scopus,
+            wos_scopus_total_annual_production_wos) 
+
+figure_1_data <-
+  wos_scopus_total_annual_production |>
+  mutate(PY = replace_na(PY, replace = 0)) |>
+  pivot_wider(names_from = ref_type,
+              values_from = n) |>
+  arrange(desc(PY))
+```
+
+I would like to create a bar graph of WoS and Scopus data
+
+We need to identify the times cited variable for each database and later sum them all.
+
+Time Cited from web of science
+
+```{r}
+TC_wos <- 
+  wos |> 
+  select(PY, TC) |> 
+  group_by(PY) |> 
+  summarise(TC_sum = sum(TC)) |> 
+  arrange(desc(PY)) |> 
+  na.omit() 
+```
+
+Time Cited from WoS
+
+```{r}
+TC_scopus <- 
+  scopus |> 
+  select(PY, TC) |> 
+  group_by(PY) |> 
+  summarise(TC_sum = sum(TC)) |> 
+  arrange(desc(PY)) |> 
+  na.omit() 
+```
+
+Time cited all
+
+```{r}
+TC_all <- 
+  TC_scopus |> 
+  left_join(TC_wos, 
+            by = "PY", 
+            suffix = c("_wos", 
+                       "_scopus")) |> 
+  replace_na(replace = list(TC_sum_scopus = 0)) |> 
+  mutate(TC_sum_all = TC_sum_wos + TC_sum_scopus,
+         TC_total = sum(TC_sum_all),
+         TC_percentage = round(TC_sum_all/TC_total, digits = 2)) |> 
+  select(PY, TC_sum_all, TC_percentage) |> 
+  filter(PY != 2022) |>
+  filter(PY >= 2000) |> 
+  arrange(desc(PY))
+```
+
+# 3.1 Scientific Production
+
+## Figure 1a - Scopus + WoS
+
+```{r}
+figure_1a <- 
+  wos_scopus_total_annual_production |> 
+  filter(ref_type != "total") |> 
+  ggplot(aes(x = factor(PY), 
+             y = n, 
+             fill = ref_type)) +
+  geom_bar(stat = "identity", 
+           position = "dodge") +
+  geom_text(aes(label = n),
+            vjust = -0.3,
+            position = position_dodge(0.9),
+            size = 3,
+            family = "Times") +
+  scale_fill_manual(values = c("springgreen3",
+                               "orange3")) +
+  theme(text = element_text(family = "Times",
+                            face = "bold",
+                            size =12),
+        panel.background = element_rect(fill = "white"),
+        legend.position = "bottom",
+        legend.title = element_text(size = 0),
+        axis.text.x = element_text(face = "bold", 
+                                   angle = 45, 
+                                   vjust = 0.5),
+        axis.line = element_line(color = "black", 
+                                 size = 0.2)) +
+  labs(y = "Number of publications", 
+       x = "Year") 
+
+figure_1a
+```
+
+## Figure 1b - Total
+
+```{r}
+figure_1b <- 
+  figure_1_data |> 
+  ggplot(aes(x = PY, y = total)) +
+  geom_line(stat = "identity", color = "red") +
+  geom_point(stat = "identity", color = "red") +
+  scale_x_continuous(breaks = seq(2000, year(today()) - 1, by = 1)) +
+  geom_text(aes(label = total),
+            vjust = -0.3,
+            position = position_dodge(0.9),
+            size = 3,
+            family = "Times", 
+            color = "red") +
+  scale_fill_manual(values = c("springgreen3",
+                               "orange3")) +
+  theme(text = element_text(family = "Times",
+                            face = "bold",
+                            size =12),
+        panel.background = element_rect(fill = "white"),
+        legend.position = "bottom",
+        legend.title = element_text(size = 0),
+        axis.text.x = element_text(face = "bold", 
+                                   angle = 45, 
+                                   vjust = 0.5),
+        axis.line = element_line(color = "black", 
+                                 size = 0.2)) +
+  labs(y = "Number of total publications", 
+       x = "Year") 
+figure_1b
+```
+
+## Figure 1c - Citations
+
+```{r}
+figure_1c <- 
+  TC_all |> 
+  ggplot(aes(x = PY , y = TC_sum_all)) +
+  geom_line(stat = "identity", color = "purple") +
+  geom_point(color = "purple") +
+  scale_x_continuous(breaks = seq(2000, year(today()) - 1 , by = 1)) +
+  geom_text(aes(label = TC_sum_all),
+            vjust = -0.3,
+            position = position_dodge(0.9),
+            size = 3,
+            family = "Times", 
+            color = "purple") +
+  scale_fill_manual(values = c("springgreen3",
+                               "orange3")) +
+  theme(text = element_text(family = "Times",
+                            face = "bold",
+                            size =12),
+        panel.background = element_rect(fill = "white"),
+        legend.position = "bottom",
+        legend.title = element_text(size = 0),
+        axis.text.x = element_text(face = "bold", 
+                                   angle = 45, 
+                                   vjust = 0.5),
+        axis.line = element_line(color = "black", 
+                                 size = 0.2)) +
+  labs(y = "Number of citations", 
+       x = "Year") 
+figure_1c
+```
+
+# 3.2 Country analysis
+
+## Table 2 - Country production
+
+```{r}
+wos_scopus_countries <- 
+  wos_scopus_tos$df |> 
+  select(SR, AU_CO, TC) |> 
+  separate_rows(AU_CO, sep = ";") |> 
+  unique() |> 
+  drop_na()
+
+wos_scopus_countries_journals <- 
+  wos_scopus_countries |> 
+  left_join(wos_scopus_tos$df |> 
+              select(SR, SO, PY), 
+            by = "SR")
+
+scimago_2020 <- 
+  read_csv2("scimago2020.csv") |> 
+  select(SO = Title,
+         quartile = "SJR Best Quartile") |> 
+  mutate(PY = 2020)
+
+scimago_2021 <- 
+  read_csv2("scimago2020.csv") |> 
+  select(SO = Title,
+         quartile = "SJR Best Quartile") |> 
+  mutate(PY = 2021)
+
+scimago_2020_2021 <- 
+  scimago_2020 |> 
+  bind_rows(scimago_2021) |> 
+  select(PY, SO, quartile)
+
+scimago <- 
+  sjr_journals |> 
+  select(PY = year, 
+         SO = title,
+         quartile = sjr_best_quartile) |> 
+  mutate(SO = str_to_upper(SO),
+         PY = as.numeric(PY)) |> 
+  bind_rows(scimago_2020_2021)
+
+
+wos_scopus_countries_journals_scimago <- 
+  wos_scopus_countries_journals |> 
+  left_join(scimago, by = c("PY", "SO")) |>  
+  drop_na() |> 
+  select(AU_CO, TC, quartile) |> 
+  filter(quartile != "-")
+```
+
+### Table 2a - production
+
+Production per country
+
+```{r}
+table_2a <- 
+  wos_scopus_countries |> 
+  select(AU_CO) |> 
+  group_by(AU_CO) |> 
+  summarise(count_co = n()) |> 
+  mutate(percentage_co = count_co / sum(count_co) * 100,
+         percentage_co = round(percentage_co, digits = 2)) |> 
+  arrange(desc(count_co))
+table_2a 
+```
+
+### Table 2b - citations
+
+Citations received per country
+
+```{r}
+table_2b <- 
+  wos_scopus_countries_journals_scimago |> 
+  select(AU_CO, TC) |> 
+  group_by(AU_CO) |> 
+  summarise(citation = sum(TC)) |> 
+  mutate(percentage_ci = citation / sum(citation) * 100) |> 
+  arrange(desc(citation))
+table_2b
+```
+
+### Table 2c - Quartiles
+
+```{r}
+table_2c <- 
+  wos_scopus_countries_journals_scimago |> 
+  select(AU_CO, quartile) |> 
+  group_by(AU_CO) |> 
+  count(quartile, sort = TRUE) |> 
+  pivot_wider(names_from = quartile, 
+              values_from = n) |> 
+  select(AU_CO, Q1, Q2, Q3, Q4) |> 
+  mutate(Q1 = replace_na(Q1, 0),
+         Q2 = replace_na(Q2, 0),
+         Q3 = replace_na(Q3, 0),
+         Q4 = replace_na(Q4, 0))
+table_2c
+```
+
+### Table 2 - Final
+
+Merging all tables 2
+
+```{r}
+table_2 <- 
+  table_2a |> 
+  left_join(table_2b, by = "AU_CO") |> 
+  left_join(table_2c, by = "AU_CO") |> 
+  mutate(percentage_ci = round(percentage_ci, digits = 2)) |> 
+  slice(1:10)
+table_2 |>
+  DT::datatable(class = "cell-border stripe", 
+                rownames = F, 
+                filter = "top", 
+                editable = FALSE, 
+                extensions = "Buttons", 
+                options = list(dom = "Bfrtip",
+                               buttons = c("copy",
+                                           "csv",
+                                           "excel", 
+                                           "pdf", 
+                                           "print")))
+```
+
+## Figure 2 - Country Collaboration
+
+Exporting data to biblioshiny
+
+```{r}
+write.xlsx(x = wos_scopus_tos$df, file = "output/wos_scopus.xlsx")
+```
+
+# 3.3 Journal Analysis
+
+## Scopus Journal Citation Network
+
+Getting JOURNAL names
+
+```{r}
+journals_all_abbr <- # From Scimago data
+  journalabbr::abbrTable |>
+  select(journal, journal_abbr) |>
+  mutate(journal_abbr = str_remove_all(journal_abbr, "\\.")) |>
+  mutate(journal_abbr = str_to_upper(journal_abbr)) |> 
+  select(journal_abbr) |> 
+  unique()
+```
+
+Creating the Journal Citation Network from Scopus
+
+```{r}
+journal_citation_edgelist <- 
+  wos_scopus_tos$df |> 
+  select(JI_main = JI, CR) |> 
+  mutate(JI_main = str_remove_all(JI_main, "\\.")) |> 
+  separate_rows(CR, sep = ";") |> 
+  mutate(JI_ref = str_remove(CR, ".*([0-9]{4}), "), 
+         JI_ref = str_remove(JI_ref, ", .*")) |> 
+  filter(!str_detect(JI_ref, "[0-9]")) |> 
+  select(-CR) |> 
+  na.omit() |> 
+  mutate(JI_ref = str_trim(JI_ref, 
+                           side = "both")) |> 
+  inner_join(journals_all_abbr, 
+             by = c("JI_ref" = "journal_abbr")) |> 
+  filter(!(JI_ref == "")) |> 
+  filter(!(JI_main == JI_ref))
+```
+
+Creating data to write some paragraphs 
+
+```{r}
+journal_citation_edgelist_ids <- 
+  wos_scopus_tos$df |> 
+  select(JI_main = JI, 
+         CR,
+         TI,
+         PY) |> 
+  mutate(JI_main = str_remove_all(JI_main, "\\.")) |> 
+  separate_rows(CR, sep = ";") |> 
+  mutate(JI_ref = str_remove(CR, ".*([0-9]{4}), "), 
+         JI_ref = str_remove(JI_ref, ", .*")) |> 
+  filter(!str_detect(JI_ref, "[0-9]")) |> 
+  # select(-CR) |> 
+  na.omit() |> 
+  mutate(JI_ref = str_trim(JI_ref, 
+                           side = "both")) |> 
+  inner_join(journals_all_abbr, 
+             by = c("JI_ref" = "journal_abbr")) |> 
+  filter(!(JI_ref == "")) |> 
+  filter(!(JI_main == JI_ref))
+```
+
+
+Creating the graph object
+
+```{r}
+journal_citation_graph_weighted <- 
+  graph_from_adjacency_matrix(as.matrix(get.adjacency(graph.data.frame(journal_citation_edgelist))),
+                              weighted = TRUE, 
+                              mode = "undirected", 
+                              diag = TRUE) |> 
+  simplify() |> 
+  giant.component()
+
+journal_citation_graph_weighted_tbl <- 
+  journal_citation_graph_weighted |> 
+  as_tbl_graph() |> 
+  activate(nodes) |> 
+  mutate(degree = centrality_degree(),
+         community = tidygraph::group_louvain())
+
+journal_citation_graph_weighted_tbl_small <- 
+  journal_citation_graph_weighted_tbl |> 
+  activate(nodes) |> 
+  filter(degree >= 1) |> 
+  activate(edges) |> 
+  filter(weight != 1)
+
+communities <- 
+  journal_citation_graph_weighted_tbl_small |> 
+  activate(nodes) |> 
+  data.frame() |> 
+  count(community, sort = TRUE) |> 
+  slice(1:10) |> 
+  select(community) |> 
+  pull()
+# Filtering biggest communities 
+journal_citation_graph_weighted_tbl_small_fig <- 
+  journal_citation_graph_weighted_tbl_small |> 
+  activate(nodes) |> 
+  filter(community %in% communities)
+
+```
+
+## Figure 3 Journal Citation Network
+
+Selecting nodes to show
+
+```{r}
+jc_com_1 <- 
+  journal_citation_graph_weighted_tbl_small_fig |> 
+  activate(nodes) |> 
+  filter(community == communities[1]) |> 
+  mutate(degree = centrality_degree()) |> 
+  arrange(desc(degree)) |> 
+  slice(1:10) |> 
+  data.frame() |> 
+  select(name)
+jc_com_2 <- 
+  journal_citation_graph_weighted_tbl_small_fig |> 
+  activate(nodes) |> 
+  filter(community == communities[2]) |> 
+  mutate(degree = centrality_degree()) |> 
+  arrange(desc(degree)) |> 
+  slice(1:10) |> 
+  data.frame() |> 
+  select(name)
+jc_com_3 <- 
+  journal_citation_graph_weighted_tbl_small_fig |> 
+  activate(nodes) |> 
+  filter(community == communities[3]) |> 
+  mutate(degree = centrality_degree()) |> 
+  arrange(desc(degree)) |> 
+  slice(1:10) |> 
+  data.frame() |> 
+  select(name)
+jc_com_4 <- 
+  journal_citation_graph_weighted_tbl_small_fig |> 
+  activate(nodes) |> 
+  filter(community == communities[4]) |> 
+  mutate(degree = centrality_degree()) |> 
+  arrange(desc(degree)) |> 
+  slice(1:10) |> 
+  data.frame() |> 
+  select(name)
+jc_com_5 <- 
+  journal_citation_graph_weighted_tbl_small_fig |> 
+  activate(nodes) |> 
+  filter(community == communities[5]) |> 
+  mutate(degree = centrality_degree()) |> 
+  arrange(desc(degree)) |> 
+  slice(1:10) |> 
+  data.frame() |> 
+  select(name)
+jc_com_6 <- 
+  journal_citation_graph_weighted_tbl_small_fig |> 
+  activate(nodes) |> 
+  filter(community == communities[6]) |> 
+  mutate(degree = centrality_degree()) |> 
+  arrange(desc(degree)) |> 
+  slice(1:10) |> 
+  data.frame() |> 
+  select(name)
+jc_com_7<- 
+  journal_citation_graph_weighted_tbl_small_fig |> 
+  activate(nodes) |> 
+  filter(community == communities[7]) |> 
+  mutate(degree = centrality_degree()) |> 
+  arrange(desc(degree)) |> 
+  slice(1:10) |> 
+  data.frame() |> 
+  select(name)
+jc_com_8 <- 
+  journal_citation_graph_weighted_tbl_small_fig |> 
+  activate(nodes) |> 
+  filter(community == communities[8]) |> 
+  mutate(degree = centrality_degree()) |> 
+  arrange(desc(degree)) |> 
+  slice(1:10) |> 
+  data.frame() |> 
+  select(name)
+jc_com_9 <- 
+  journal_citation_graph_weighted_tbl_small_fig |> 
+  activate(nodes) |> 
+  filter(community == communities[9]) |> 
+  mutate(degree = centrality_degree()) |> 
+  arrange(desc(degree)) |> 
+  slice(1:10) |> 
+  data.frame() |> 
+  select(name)
+jc_com_10 <- 
+  journal_citation_graph_weighted_tbl_small_fig |> 
+  activate(nodes) |> 
+  filter(community == communities[10]) |> 
+  mutate(degree = centrality_degree()) |> 
+  arrange(desc(degree)) |> 
+  slice(1:10) |> 
+  data.frame() |> 
+  select(name)
+jc_com <- 
+  jc_com_1 |> 
+  bind_rows(jc_com_2,
+            jc_com_3,
+            # jc_com_4,
+            # jc_com_5,
+            # jc_com_6,
+            # jc_com_7,
+            # jc_com_8,
+            # jc_com_9,
+            # jc_com_10
+  )
+```
+
+### Figure 3a Journal Citation
+
+```{r}
+figure_3a <- 
+journal_citation_graph_weighted_tbl_small_fig |> 
+  activate(nodes) |> 
+  filter(name %in% jc_com$name) |>
+  mutate(degree = centrality_degree(),
+         community = factor(community)) |> 
+  filter(degree != 0) |> 
+  ggraph(layout = "graphopt") +
+  geom_edge_link(aes(width = weight),
+                 colour = "lightgray") +
+      scale_edge_width(name = "Link strength") +
+  geom_node_point(aes(color = community, 
+                      size = degree)) +
+  geom_node_text(aes(label = name), repel = TRUE) +
+  scale_size(name = "Degree") +
+  # scale_color_binned(name = "Communities") +
+  theme_graph()
+figure_3a
+```
+
+### Figure 3b clusters
+
+```{r}
+figure_3b <- 
+  journal_citation_graph_weighted_tbl_small |> 
+  activate(nodes) |> 
+  data.frame() |> 
+  select(community) |> 
+  count(community, sort = TRUE) |> 
+  slice(1:10) |> 
+  ggplot(aes(x = reorder(community, n), y = n)) +
+  geom_point(stat = "identity") +
+  geom_line(group = 1) + 
+  # geom_text(label = as.numeric(community),
+  #           nudge_x = 0.5,
+  #           nudge_y = 0.5,
+  #           check_overlap = T) +
+  labs(title = "Communities by size", 
+       x = "communities", 
+       y = "Authors") +
+  theme(text = element_text(color = "black",
+                            face = "bold",
+                            family = "Times New Roman"),
+        plot.title = element_text(size = 25),
+        panel.background = element_rect(fill = "white"), 
+        axis.text.y = element_text(size = 15, 
+                                   colour = "black"),
+        axis.text.x = element_text(size = 15,
+                                   colour = "black"),
+        axis.title.x = element_text(size = 20),
+        axis.title.y = element_text(size = 20)) 
+figure_3b
+```
+
+# Exporting data 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+list_of_files <- list(wos_scopus_tos = wos_scopus_tos$df,
+                      TC_all = TC_all, 
+                      figure_1_data = figure_1_data)
+
+write.xlsx(list_of_files, file = "figure_1_data.xlsx")
+```
+
+
