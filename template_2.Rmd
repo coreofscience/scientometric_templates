@@ -6,12 +6,10 @@ output:
   html_document:
             toc: TRUE
             toc_float: TRUE
-editor_options: 
-  chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+# knitr::opts_chunk$set(echo = TRUE)
 ```
 
 # Creating the environment
@@ -46,14 +44,14 @@ giant.component <- function(graph) {
 
 ```{r message=FALSE, warning=FALSE, echo=FALSE}
 wos_scopus_tos <- 
-  tosr::tosr_load("scientometrics.bib", 
-                  "scientometrics.txt")
+  tosr::tosr_load("ana_carolina_paper_2.bib", 
+                  "ana_carolina_paper_2.txt")
 
 wos <- 
-  bibliometrix::convert2df("scientometrics.txt")  # create dataframe from wos file
+  bibliometrix::convert2df("ana_carolina_paper_2.txt")  # create dataframe from wos file
 
 scopus <- 
-  bibliometrix::convert2df("scientometrics.bib", # Create dataframe from scopus file
+  bibliometrix::convert2df("ana_carolina_paper_2.bib", # Create dataframe from scopus file
                            dbsource = "scopus", 
                            format = "bibtex")
 ```
@@ -124,7 +122,7 @@ scopus_wos_final <-
 wos_anual_production <- 
   wos |> 
   select(PY) |> 
-  count(PY, sort = TRUE) |> 
+  dplyr::count(PY, sort = TRUE) |> 
   na.omit() |> 
   filter(PY >= 2000,
          PY < year(today())) |> 
@@ -133,7 +131,7 @@ wos_anual_production <-
 scopus_anual_production  <- 
   scopus |> 
   select(PY) |> 
-  count(PY, sort = TRUE) |> 
+  dplyr::count(PY, sort = TRUE) |> 
   na.omit() |> 
   filter(PY >= 2000,
          PY < year(today())) |>
@@ -142,7 +140,7 @@ scopus_anual_production  <-
 total_anual_production <- 
   wos_scopus_tos$df |> 
   select(PY) |> 
-  count(PY, sort = TRUE) |> 
+  dplyr::count(PY, sort = TRUE) |> 
   na.omit() |> 
   filter(PY >= 2000,
          PY < year(today())) |>
@@ -157,17 +155,22 @@ wos_scopus_total_annual_production <-
 # Checking results of total
 wos_scopus_total_annual_production_dummy <- 
   total_anual_production |> 
-  rename(n_total = n,
-         ref_type_total = ref_type) |> 
+  dplyr::rename(n_total = n,
+                ref_type_total = ref_type) |> 
   left_join(wos_anual_production |> 
-              rename(n_wos = n,
-                     ref_type_wos = ref_type) ) |> 
+              dplyr::rename(n_wos = n,
+                            ref_type_wos = ref_type) ) |> 
   left_join(scopus_anual_production |> 
-              rename(n_scopus = n,
-                     ref_type_scopus = ref_type)) |> 
+              dplyr::rename(n_scopus = n,
+                            ref_type_scopus = ref_type)) |> 
   mutate(total = if_else(n_total < n_wos | n_total < n_scopus, 
                          n_scopus, # it could be improved
-                         n_total))
+                         n_total)) |> 
+  replace_na(list(n_wos = 0, 
+                  n_scopus = 0, 
+                  total = 0,
+                  ref_type_wos = "wos",
+                  ref_type_scopus = "scopus"))
 
 wos_scopus_total_annual_production_total <- 
   wos_scopus_total_annual_production_dummy |> 
@@ -209,9 +212,9 @@ Time Cited from web of science
 ```{r}
 TC_wos <- 
   wos |> 
-  select(PY, TC) |> 
-  group_by(PY) |> 
-  summarise(TC_sum = sum(TC)) |> 
+  dplyr::select(PY, TC) |> 
+  dplyr::group_by(PY) |> 
+  dplyr::summarise(TC_sum = sum(TC)) |> 
   arrange(desc(PY)) |> 
   na.omit() 
 ```
@@ -221,9 +224,9 @@ Time Cited from WoS
 ```{r}
 TC_scopus <- 
   scopus |> 
-  select(PY, TC) |> 
-  group_by(PY) |> 
-  summarise(TC_sum = sum(TC)) |> 
+  dplyr::select(PY, TC) |> 
+  dplyr::group_by(PY) |> 
+  dplyr::summarise(TC_sum = sum(TC)) |> 
   arrange(desc(PY)) |> 
   na.omit() 
 ```
@@ -410,12 +413,12 @@ Production per country
 ```{r}
 table_2a <- 
   wos_scopus_countries |> 
-  select(AU_CO) |> 
-  group_by(AU_CO) |> 
-  summarise(count_co = n()) |> 
-  mutate(percentage_co = count_co / sum(count_co) * 100,
-         percentage_co = round(percentage_co, digits = 2)) |> 
-  arrange(desc(count_co))
+  dplyr::select(AU_CO) |> 
+  dplyr::group_by(AU_CO) |> 
+  dplyr::summarise(count_co = n()) |> 
+  dplyr::mutate(percentage_co = count_co / sum(count_co) * 100,
+                percentage_co = round(percentage_co, digits = 2)) |> 
+  dplyr::arrange(desc(count_co))
 table_2a 
 ```
 
@@ -426,11 +429,11 @@ Citations received per country
 ```{r}
 table_2b <- 
   wos_scopus_countries_journals_scimago |> 
-  select(AU_CO, TC) |> 
-  group_by(AU_CO) |> 
-  summarise(citation = sum(TC)) |> 
-  mutate(percentage_ci = citation / sum(citation) * 100) |> 
-  arrange(desc(citation))
+  dplyr::select(AU_CO, TC) |> 
+  dplyr::group_by(AU_CO) |> 
+  dplyr::summarise(citation = sum(TC)) |> 
+  dplyr::mutate(percentage_ci = citation / sum(citation) * 100) |> 
+  dplyr::arrange(desc(citation))
 table_2b
 ```
 
@@ -439,16 +442,16 @@ table_2b
 ```{r}
 table_2c <- 
   wos_scopus_countries_journals_scimago |> 
-  select(AU_CO, quartile) |> 
-  group_by(AU_CO) |> 
-  count(quartile, sort = TRUE) |> 
+  dplyr::select(AU_CO, quartile) |> 
+  dplyr::group_by(AU_CO) |> 
+  dplyr::count(quartile, sort = TRUE) |> 
   pivot_wider(names_from = quartile, 
               values_from = n) |> 
-  select(AU_CO, Q1, Q2, Q3, Q4) |> 
-  mutate(Q1 = replace_na(Q1, 0),
-         Q2 = replace_na(Q2, 0),
-         Q3 = replace_na(Q3, 0),
-         Q4 = replace_na(Q4, 0))
+  dplyr::select(AU_CO, Q1, Q2, Q3, Q4) |> 
+  dplyr::mutate(Q1 = replace_na(Q1, 0),
+                Q2 = replace_na(Q2, 0),
+                Q3 = replace_na(Q3, 0),
+                Q4 = replace_na(Q4, 0))
 table_2c
 ```
 
@@ -482,10 +485,62 @@ table_2 |>
 Exporting data to biblioshiny
 
 ```{r}
-write.xlsx(x = wos_scopus_tos$df, file = "output/wos_scopus.xlsx")
+write.xlsx(x = wos_scopus_tos$df, file = "wos_scopus.xlsx")
 ```
 
 # 3.3 Journal Analysis
+
+## Table 3 Most productive scientific journals
+
+```{r}
+table_1 <- 
+  tibble(wos = length(wos$SR), # Create a dataframe with the values.
+         scopus = length(scopus$SR), 
+         total = length(wos_scopus_tos$df$SR))
+
+wos_journal <- 
+  wos |> 
+  dplyr::select(journal = SO) |> 
+  na.omit() |> 
+  dplyr::count(journal, sort = TRUE) |> 
+  dplyr::slice(1:20) |> 
+  dplyr::rename(publications = n) |> 
+  dplyr::mutate(database = "wos")
+
+scopus_journal <- 
+  scopus |> 
+  dplyr::select(journal = SO) |> 
+  na.omit() |> 
+  dplyr::count(journal, sort = TRUE) |> 
+  dplyr::slice(1:20) |> 
+  dplyr::rename(publications = n) |> 
+  dplyr::mutate(database = "scopus")
+
+total_journal <- 
+  wos_scopus_tos$df |> 
+  dplyr::select(journal = SO) |> 
+  na.omit() |> 
+  dplyr::count(journal, sort = TRUE) |> 
+  dplyr::slice(1:20) |> 
+  dplyr::rename(publications = n) |> 
+  dplyr::mutate(database = "total")
+
+wos_scopus_total_journal <- 
+  wos_journal |> 
+  dplyr::bind_rows(scopus_journal, 
+                   total_journal) |> 
+  pivot_wider(names_from = database, 
+                     values_from = publications) |> 
+  dplyr::arrange(desc(total)) |> 
+  dplyr::slice(1:10) |> 
+  dplyr::mutate_all(~replace_na(., 0)) |> 
+  dplyr::mutate(percentage = total / table_1 |> 
+                  dplyr::pull(total),
+                percentage = round(percentage, digits = 2))
+
+
+wos_scopus_total_journal
+```
 
 ## Scopus Journal Citation Network
 
@@ -562,29 +617,29 @@ journal_citation_graph_weighted_tbl <-
   journal_citation_graph_weighted |> 
   as_tbl_graph() |> 
   activate(nodes) |> 
-  mutate(degree = centrality_degree(),
-         community = tidygraph::group_louvain())
+  dplyr::mutate(degree = centrality_degree(),
+                community = tidygraph::group_louvain())
 
 journal_citation_graph_weighted_tbl_small <- 
   journal_citation_graph_weighted_tbl |> 
   activate(nodes) |> 
-  filter(degree >= 1) |> 
+  dplyr::filter(degree >= 1) |> 
   activate(edges) |> 
-  filter(weight != 1)
+  dplyr::filter(weight != 1)
 
 communities <- 
   journal_citation_graph_weighted_tbl_small |> 
   activate(nodes) |> 
   data.frame() |> 
-  count(community, sort = TRUE) |> 
-  slice(1:10) |> 
-  select(community) |> 
-  pull()
+  dplyr::count(community, sort = TRUE) |> 
+  dplyr::slice(1:10) |> 
+  dplyr::select(community) |> 
+  dplyr::pull()
 # Filtering biggest communities 
 journal_citation_graph_weighted_tbl_small_fig <- 
   journal_citation_graph_weighted_tbl_small |> 
   activate(nodes) |> 
-  filter(community %in% communities)
+  dplyr::filter(community %in% communities)
 
 ```
 
@@ -596,93 +651,93 @@ Selecting nodes to show
 jc_com_1 <- 
   journal_citation_graph_weighted_tbl_small_fig |> 
   activate(nodes) |> 
-  filter(community == communities[1]) |> 
-  mutate(degree = centrality_degree()) |> 
-  arrange(desc(degree)) |> 
-  slice(1:10) |> 
+  dplyr::filter(community == communities[1]) |> 
+  dplyr::mutate(degree = centrality_degree()) |> 
+  dplyr::arrange(desc(degree)) |> 
+  dplyr::slice(1:10) |> 
   data.frame() |> 
-  select(name)
+  dplyr::select(name)
 jc_com_2 <- 
   journal_citation_graph_weighted_tbl_small_fig |> 
   activate(nodes) |> 
-  filter(community == communities[2]) |> 
-  mutate(degree = centrality_degree()) |> 
-  arrange(desc(degree)) |> 
-  slice(1:10) |> 
+  dplyr::filter(community == communities[2]) |> 
+  dplyr::mutate(degree = centrality_degree()) |> 
+  dplyr::arrange(desc(degree)) |> 
+  dplyr::slice(1:10) |> 
   data.frame() |> 
-  select(name)
+  dplyr::select(name)
 jc_com_3 <- 
   journal_citation_graph_weighted_tbl_small_fig |> 
   activate(nodes) |> 
-  filter(community == communities[3]) |> 
-  mutate(degree = centrality_degree()) |> 
-  arrange(desc(degree)) |> 
-  slice(1:10) |> 
+  dplyr::filter(community == communities[3]) |> 
+  dplyr::mutate(degree = centrality_degree()) |> 
+  dplyr::arrange(desc(degree)) |> 
+  dplyr::slice(1:10) |> 
   data.frame() |> 
-  select(name)
+  dplyr::select(name)
 jc_com_4 <- 
   journal_citation_graph_weighted_tbl_small_fig |> 
   activate(nodes) |> 
-  filter(community == communities[4]) |> 
-  mutate(degree = centrality_degree()) |> 
-  arrange(desc(degree)) |> 
-  slice(1:10) |> 
+  dplyr::filter(community == communities[4]) |> 
+  dplyr::mutate(degree = centrality_degree()) |> 
+  dplyr::arrange(desc(degree)) |> 
+  dplyr::slice(1:10) |> 
   data.frame() |> 
-  select(name)
+  dplyr::select(name)
 jc_com_5 <- 
   journal_citation_graph_weighted_tbl_small_fig |> 
   activate(nodes) |> 
-  filter(community == communities[5]) |> 
-  mutate(degree = centrality_degree()) |> 
-  arrange(desc(degree)) |> 
-  slice(1:10) |> 
+  dplyr::filter(community == communities[5]) |> 
+  dplyr::mutate(degree = centrality_degree()) |> 
+  dplyr::arrange(desc(degree)) |> 
+  dplyr::slice(1:10) |> 
   data.frame() |> 
-  select(name)
+  dplyr::select(name)
 jc_com_6 <- 
   journal_citation_graph_weighted_tbl_small_fig |> 
   activate(nodes) |> 
-  filter(community == communities[6]) |> 
-  mutate(degree = centrality_degree()) |> 
-  arrange(desc(degree)) |> 
-  slice(1:10) |> 
+  dplyr::filter(community == communities[6]) |> 
+  dplyr::mutate(degree = centrality_degree()) |> 
+  dplyr::arrange(desc(degree)) |> 
+  dplyr::slice(1:10) |> 
   data.frame() |> 
-  select(name)
+  dplyr::select(name)
 jc_com_7<- 
   journal_citation_graph_weighted_tbl_small_fig |> 
   activate(nodes) |> 
-  filter(community == communities[7]) |> 
-  mutate(degree = centrality_degree()) |> 
-  arrange(desc(degree)) |> 
-  slice(1:10) |> 
+  dplyr::filter(community == communities[7]) |> 
+  dplyr::mutate(degree = centrality_degree()) |> 
+  dplyr::arrange(desc(degree)) |> 
+  dplyr::slice(1:10) |> 
   data.frame() |> 
-  select(name)
+  dplyr::select(name)
 jc_com_8 <- 
   journal_citation_graph_weighted_tbl_small_fig |> 
   activate(nodes) |> 
-  filter(community == communities[8]) |> 
-  mutate(degree = centrality_degree()) |> 
-  arrange(desc(degree)) |> 
-  slice(1:10) |> 
+  dplyr::filter(community == communities[8]) |> 
+  dplyr::mutate(degree = centrality_degree()) |> 
+  dplyr::arrange(desc(degree)) |> 
+  dplyr::slice(1:10) |> 
   data.frame() |> 
-  select(name)
+  dplyr::select(name)
 jc_com_9 <- 
   journal_citation_graph_weighted_tbl_small_fig |> 
   activate(nodes) |> 
-  filter(community == communities[9]) |> 
-  mutate(degree = centrality_degree()) |> 
-  arrange(desc(degree)) |> 
-  slice(1:10) |> 
+  dplyr::filter(community == communities[9]) |> 
+  dplyr::mutate(degree = centrality_degree()) |> 
+  dplyr::arrange(desc(degree)) |> 
+  dplyr::slice(1:10) |> 
   data.frame() |> 
-  select(name)
+  dplyr::select(name)
 jc_com_10 <- 
   journal_citation_graph_weighted_tbl_small_fig |> 
   activate(nodes) |> 
-  filter(community == communities[10]) |> 
-  mutate(degree = centrality_degree()) |> 
-  arrange(desc(degree)) |> 
-  slice(1:10) |> 
+  dplyr::filter(community == communities[10]) |> 
+  dplyr::mutate(degree = centrality_degree()) |> 
+  dplyr::arrange(desc(degree)) |> 
+  dplyr::slice(1:10) |> 
   data.frame() |> 
-  select(name)
+  dplyr::select(name)
 jc_com <- 
   jc_com_1 |> 
   bind_rows(jc_com_2,
@@ -703,10 +758,10 @@ jc_com <-
 figure_3a <- 
   journal_citation_graph_weighted_tbl_small_fig |> 
   activate(nodes) |> 
-  filter(name %in% jc_com$name) |>
-  mutate(degree = centrality_degree(),
-         community = factor(community)) |> 
-  filter(degree != 0) |> 
+  dplyr::filter(name %in% jc_com$name) |>
+  dplyr::mutate(degree = centrality_degree(),
+                community = factor(community)) |> 
+  dplyr::filter(degree != 0) |> 
   ggraph(layout = "graphopt") +
   geom_edge_link(aes(width = weight),
                  colour = "lightgray") +
@@ -727,9 +782,9 @@ figure_3b <-
   journal_citation_graph_weighted_tbl_small |> 
   activate(nodes) |> 
   data.frame() |> 
-  select(community) |> 
-  count(community, sort = TRUE) |> 
-  slice(1:10) |> 
+  dplyr::select(community) |> 
+  dplyr::count(community, sort = TRUE) |> 
+  dplyr::slice(1:10) |> 
   ggplot(aes(x = reorder(community, n), y = n)) +
   geom_point(stat = "identity") +
   geom_line(group = 1) + 
@@ -755,6 +810,50 @@ figure_3b
 ```
 
 # 3.1.4 Author Analysis
+
+Table 4
+
+```{r}
+
+data_biblio_wos <- biblioAnalysis(wos)
+
+wos_authors <- 
+  data_biblio_wos$Authors |> 
+  data.frame() |> 
+  rename(authors_wos = AU, papers_wos = Freq) |> 
+  arrange(desc(papers_wos)) |> 
+  slice(1:10) |> 
+  mutate(database_wos = "wos")
+
+data_biblio_scopus <- biblioAnalysis(scopus)
+
+scopus_authors <- 
+  data_biblio_scopus$Authors |> 
+  data.frame() |> 
+  rename(authors_scopus = AU, papers_scopus = Freq) |> 
+  arrange(desc(papers_scopus)) |> 
+  slice(1:10) |> 
+  mutate(database_scopus = "scopus")
+
+data_biblio_total <- biblioAnalysis(wos_scopus_tos$df)
+
+total_authors <- 
+  data_biblio_total$Authors |> 
+  data.frame() |> 
+  rename(authors_total = AU, 
+         papers_total = Freq) |> 
+  arrange(desc(papers_total)) |> 
+  slice(1:10) |> 
+  mutate(database_total = "total")
+
+wos_scopus_authors <- 
+  wos_authors |> 
+  bind_cols(scopus_authors,
+            total_authors)
+
+wos_scopus_authors
+```
+
 
 ## Scopus
 
@@ -1502,11 +1601,22 @@ asn_TM_selected_nodes |>
 # Exporting data 
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
-list_of_files <- list(wos_scopus_tos = wos_scopus_tos$df,
+list_of_files <- list(wos = wos,
+                      scopus = scopus,
+                      wos_scopus_tos = wos_scopus_tos$df,
                       TC_all = TC_all, 
-                      figure_1_data = figure_1_data)
+                      figure_1_data = figure_1_data,
+                      table_2 = table_2,
+                      table_3 = wos_scopus_total_journal, 
+                      table_4 = wos_scopus_authors)
 
-write.xlsx(list_of_files, file = "figure_1_data.xlsx")
+write.xlsx(list_of_files, file = "all_data.xlsx")
+
+graph_asn_ig <- 
+  asn_TM_connected |> 
+  as.igraph()
+
+write.graph(graph = graph_asn_ig, file = "asn.graphml", format = "graphml")
 ```
 
 
