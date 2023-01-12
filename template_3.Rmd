@@ -376,10 +376,10 @@ figure_1c
 library(reticulate)
 
 # create a new environment 
-conda_create("r-reticulate")
+# conda_create("r-reticulate")
 
 # install Matplotlib
-conda_install("r-reticulate", "matplotlib")
+# conda_install("r-reticulate", "matplotlib")
 
 # import Matplotlib (it will be automatically discovered in "r-reticulate")
 plt <- import("matplotlib")
@@ -397,6 +397,8 @@ TC_all$TC_sum_all <- as.integer(TC_all$TC_sum_all)
 
 # Figure 1C
 # tc means total citations
+
+import numpy as np
 
 tcx = r.TC_all['PY']
 tcy = r.TC_all['TC_sum_all']
